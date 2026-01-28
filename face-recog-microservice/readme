@@ -1,0 +1,8 @@
+# 1. Activează mediul virtual
+source venv/bin/activate
+
+# (Vei vedea (venv) în stânga prompt-ului după asta)
+
+# 2. Rulează aplicația
+# Folosim --host 0.0.0.0 ca să poți accesa API-ul și din browserul de Windows
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8006

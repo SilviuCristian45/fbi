@@ -1,0 +1,5 @@
+namespace FbiApi.Services;
+
+public interface IImageService {
+    public Task<string?> uploadImage(IFormFile file);
+}

@@ -1,0 +1,43 @@
+# --certbot 
+# --- Certbot Generated Data ---
+certbot/conf/
+certbot/work/
+certbot/logs/
+
+# --- SECRETE (NU LE URCA NICIODATA) ---
+.env
+.env.local
+*.pem
+*.key
+*.pfx
+
+# --- Docker & Logs ---
+docker-compose.override.yml
+*.log
+npm-debug.log*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.deepface/
+
+# --- .NET / C# ---
+bin/
+obj/
+.vs/
+*.user
+appsettings.Development.json
+
+# --- Next.js / Node ---
+node_modules/
+.next/
+dist/
+build/
+.DS_Store
+
+# --- IDE ---
+.idea/
+.vscode/

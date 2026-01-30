@@ -1,5 +1,5 @@
 # 🕵️‍♂️ FBI - Advanced Surveillance & Face Recognition System
-
+This is an educational project/simulation created for portfolio purposes. It is not affiliated with the Federal Bureau of Investigation.
 > **A distributed, event-driven microservices architecture for real-time tracking, reporting, and AI verification of wanted persons.**
 
 ![Project Status](https://img.shields.io/badge/status-active-success)
@@ -122,3 +122,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 *Built with ❤️ by [Silviu Dinca]*
+

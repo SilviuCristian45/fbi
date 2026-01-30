@@ -6,6 +6,22 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Docker](https://img.shields.io/badge/deployment-docker--compose-blue)
 
+## 🎥 Live Demo
+
+
+
+https://github.com/user-attachments/assets/ac250e78-cb73-4447-a52b-215ec3430325
+
+Url 🌍 : https://silviu-proiect.space
+
+Accounts:
+
+username: admin
+pass: 1234
+
+username: user
+pass: 1234
+
 ## 🌍 Overview
 
 The **FBI Surveillance System** is a next-generation platform designed to crowdsource intelligence on wanted individuals. It bridges the gap between public reporting and law enforcement verification using advanced AI.
@@ -104,4 +120,5 @@ Contributions are welcome! Please follow these steps:
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
+
 *Built with ❤️ by [Silviu Dinca]*

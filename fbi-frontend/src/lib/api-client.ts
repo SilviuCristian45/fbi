@@ -16,6 +16,22 @@ function normalizeUrl(url: string): string {
 export async function fetchWithGeneric<T>(url: string, options?: RequestInit): Promise<ApiResponse<T>> {
   const finalUrl = normalizeUrl(url);
   const response = await fetch(finalUrl, options);
+
+  if (response.status === 401) {
+    console.warn("Sesiune expirată. Redirectare spre login...");
+    
+    // Verificăm dacă suntem în browser ca să putem face redirect
+    if (typeof window !== 'undefined') {
+      // Opțional: Șterge token-ul vechi dacă îl ții în localStorage/Cookies
+      localStorage.removeItem('token'); 
+      
+      // Redirect forțat
+      window.location.href = '/auth/login';
+    }
+    // Oprim execuția aici ca să nu ajungă la eroarea de JSON
+    throw new Error("Unauthorized");
+  }
+  
   const json = await response.json();
 
   if (!response.ok) {

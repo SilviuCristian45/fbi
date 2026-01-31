@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { authFetch } from "@/src/lib/api-client";
 import toast, { Toaster } from "react-hot-toast";
 import RouteModal from "./RouteModal";
-// 👇 1. Importăm hook-ul de context (folosește calea relativă ca să nu ai erori)
 import { useSignalR } from "../context/SignalRContext"; 
 
 export interface Sighting {
@@ -24,7 +23,6 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
     const [highlightId, setHighlightId] = useState<number | null>(null);
     const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
 
-    // 👇 2. Luăm conexiunea gata făcută din AuthGuard
     const { connection } = useSignalR(); 
 
     // Helper: Verifică dacă e video
@@ -85,14 +83,10 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
         fetchHistory();
     }, [wantedId]);
 
-    // 🔥 4. SIGNALR OPTIMIZAT (Folosim conexiunea partajată)
+    // 🔥 4. SIGNALR OPTIMIZAT
     useEffect(() => {
-        // Dacă conexiunea nu e gata (AuthGuard încă lucrează), așteptăm
         if (!connection) return;
 
-        console.log("🔗 SightingsList s-a abonat la conexiunea globală.");
-
-        // Definim handler-ul
         const handleNewLocation = (newReport: Sighting) => {
             if (newReport.wantedPersonId === Number(wantedId)) {
                 setSightings(prev => [newReport, ...prev]);
@@ -103,19 +97,15 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
             }
         };
 
-        // Ne ABONĂM la eveniment
         connection.on("ReceiveLocation", handleNewLocation);
 
-        // CLEANUP: Ne DEZABONĂM doar de la acest eveniment când ieșim de pe pagină.
-        // NU oprim conexiunea (connection.stop), pentru că e folosită de AuthGuard!
         return () => {
             connection.off("ReceiveLocation", handleNewLocation);
-            console.log("🔌 SightingsList s-a dezabonat.");
         };
     }, [connection, wantedId]);
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors">
             <Toaster />
             <RouteModal 
                 isOpen={isRouteModalOpen}
@@ -132,52 +122,58 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
                     </span>
                     Live Intelligence Feed
                 </h3>
-                <span className="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Secured Channel</span>
-                <button 
-                    onClick={() => setIsRouteModalOpen(true)}
-                    disabled={sightings.length === 0}
-                    className="ml-4 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    View Route 🗺️
-                </button>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded hidden sm:inline-block">Secured Channel</span>
+                    <button 
+                        onClick={() => setIsRouteModalOpen(true)}
+                        disabled={sightings.length === 0}
+                        className="ml-2 sm:ml-4 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        View Route 🗺️
+                    </button>
+                </div>
             </div>
 
-            <div className="max-h-[400px] overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-gray-300">
+            <div className="max-h-[400px] overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-500">Se decriptează datele...</div>
+                    <div className="p-8 text-center text-gray-500 dark:text-gray-400">Se decriptează datele...</div>
                 ) : sightings.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 italic">Nicio raportare recentă în baza de date.</div>
+                    <div className="p-8 text-center text-gray-400 dark:text-gray-500 italic">Nicio raportare recentă în baza de date.</div>
                 ) : (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
                         {sightings.map((report) => {
                             const isNew = report.id === highlightId;
                             return (
                                 <div 
                                     key={report.id} 
-                                    className={`p-4 transition-all duration-1000 ${isNew ? "bg-red-100 border-l-4 border-red-500 shadow-inner" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
+                                    className={`p-4 transition-all duration-1000 
+                                        ${isNew 
+                                            ? "bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 shadow-inner" 
+                                            : "hover:bg-slate-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent"
+                                        }`}
                                 >
                                     <div className="flex justify-between items-start mb-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`font-bold text-sm ${isNew ? 'text-red-800' : 'text-blue-700'}`}>Agent {report.reportedBy}</span>
-                                            <span className="text-xs text-gray-400">• {new Date(report.timestamp).toLocaleString()}</span>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={`font-bold text-sm ${isNew ? 'text-red-800 dark:text-red-300' : 'text-blue-700 dark:text-blue-400'}`}>Agent {report.reportedBy}</span>
+                                            <span className="text-xs text-gray-400 dark:text-gray-500">• {new Date(report.timestamp).toLocaleString()}</span>
                                             {isNew && <span className="text-xs bg-red-500 text-white px-1.5 rounded font-bold animate-pulse">NEW</span>}
                                         </div>
                                         <a 
                                             href={`https://www.google.com/maps/search/?api=1&query=${report.lat},${report.lng}`} 
                                             target="_blank" rel="noopener noreferrer"
-                                            className="text-xs bg-gray-100 hover:bg-blue-100 text-gray-600 hover:text-blue-700 px-2 py-1 rounded border border-gray-200 transition-colors"
+                                            className="text-xs bg-gray-100 hover:bg-blue-100 text-gray-600 hover:text-blue-700 dark:bg-gray-700 dark:hover:bg-blue-900 dark:text-gray-300 dark:hover:text-blue-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600 transition-colors whitespace-nowrap ml-2"
                                         >
                                             Harta 🗺️
                                         </a>
                                     </div>
                                     
-                                    <p className="text-gray-800 text-sm mt-2 font-medium">{report.details}</p>
+                                    <p className="text-gray-800 dark:text-gray-200 text-sm mt-2 font-medium break-words">{report.details}</p>
 
                                     {/* 👇 AFISARE MEDIA */}
                                     {report.fileUrl && (
                                         <div className="mt-3 mb-2">
                                             {isVideo(report.fileUrl) ? (
-                                                <div className="relative rounded-lg overflow-hidden bg-black border border-gray-300">
+                                                <div className="relative rounded-lg overflow-hidden bg-black border border-gray-300 dark:border-gray-600">
                                                     <video 
                                                         src={report.fileUrl} 
                                                         controls 
@@ -192,7 +188,7 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
                                                     <img 
                                                         src={report.fileUrl} 
                                                         alt="Evidence" 
-                                                        className="w-full h-48 object-cover rounded-lg border border-gray-300 hover:opacity-95 transition-opacity cursor-pointer"
+                                                        className="w-full h-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 hover:opacity-95 transition-opacity cursor-pointer"
                                                         onClick={() => window.open(report.fileUrl, '_blank')}
                                                     />
                                                     <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider">
@@ -203,7 +199,7 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
                                         </div>
                                     )}
 
-                                    <div className="mt-2 text-xs font-mono text-gray-500 flex gap-4">
+                                    <div className="mt-2 text-xs font-mono text-gray-500 dark:text-gray-400 flex gap-4">
                                         <span>LAT: {report.lat.toFixed(5)}</span>
                                         <span>LNG: {report.lng.toFixed(5)}</span>
                                     </div>

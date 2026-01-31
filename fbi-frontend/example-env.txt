@@ -1,3 +1,4 @@
-# Atenție: Nu pune slash "/" la final!
 NEXT_PUBLIC_API_URL=http://localhost:7002/api
 NEXT_PUBLIC_WEBSOCKETS_URL=http://localhost:7002/hubs/surveillance
+NEXT_PUBLIC_FILE_API=http://localhost:7005/upload
+NEXT_PUBLIC_FILE_API_KEY=fbi-top-secret-key-2024

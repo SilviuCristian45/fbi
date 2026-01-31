@@ -50,7 +50,7 @@ builder.Services.AddMassTransit(x =>
     x.UsingRabbitMq((context, cfg) =>
     {
         // Setările de conectare
-        cfg.Host(rabbitMqConfig["Host"], "/", h =>
+        cfg.Host(rabbitMqConfig["Host"] ?? "localhost", "/", h =>
         {
             h.Username(rabbitMqConfig["Username"]);
             h.Password(rabbitMqConfig["Password"]);

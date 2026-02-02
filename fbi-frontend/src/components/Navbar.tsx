@@ -83,6 +83,11 @@ export const Navbar = () => {
           </Link>
         )}
 
+{/* 👇 LINK NOU AICI */}
+        <Link href="/my-location" className={getLinkClass("/my-location")}>
+          Locația Mea 📍
+        </Link>
+        
         {role === "ADMIN" && (
           <Link href="/reports" className={getLinkClass("/reports")}>
             Reports 📝

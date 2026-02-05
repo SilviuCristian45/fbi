@@ -14,6 +14,7 @@ const MapInner = dynamic(() => import("@/src/components/MapInner"), {
 export default function MyLocationPage() {
     const [position, setPosition] = useState<[number, number] | null>(null);
     const [loading, setLoading] = useState(false);
+    const [geoLoading, setGeoLoading] = useState(false); // Loading separat pentru butonul GPS
 
     useEffect( () => {
         setLoading(true);
@@ -36,6 +37,29 @@ export default function MyLocationPage() {
             setLoading(false);
         }
     }, [])
+
+    const handleGetGPS = () => {
+        if (!navigator.geolocation) {
+            alert("Browserul tău nu suportă geolocația.");
+            return;
+        }
+
+        setGeoLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const { latitude, longitude } = pos.coords;
+                setPosition([latitude, longitude]); // Actualizăm harta instant
+                setGeoLoading(false);
+                // alert("Locație GPS detectată! Acum poți apăsa 'Salvează'.");
+            },
+            (err) => {
+                console.error(err);
+                alert("Nu am putut obține locația. Verifică permisiunile browserului.");
+                setGeoLoading(false);
+            },
+            { enableHighAccuracy: true } // Cere precizie maximă
+        );
+    };
 
     // Funcția care trimite datele la backend (o vom lega de endpoint-ul C# mai târziu)
     const handleSetHome = async () => {
@@ -98,6 +122,24 @@ export default function MyLocationPage() {
                         <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
                             {position ? `Coordonate selectate: ${position[0].toFixed(5)}, ${position[1].toFixed(5)}` : "Nicio locație selectată"}
                         </div>
+
+
+                        {/* --- 2. BUTON GPS NOU --- */}
+                            <button
+                                onClick={handleGetGPS}
+                                disabled={geoLoading || loading}
+                                className="px-6 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-white bg-blue-500 hover:bg-blue-600 hover:-translate-y-0.5 shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {geoLoading ? (
+                                    <>
+                                        <span className="animate-spin">📡</span> Căutare GPS...
+                                    </>
+                                ) : (
+                                    <>
+                                        🛰️ Detectează Automat
+                                    </>
+                                )}
+                            </button>
 
                         <button
                             onClick={handleSetHome}

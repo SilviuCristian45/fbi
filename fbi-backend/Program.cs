@@ -186,6 +186,7 @@ builder.Services.AddSingleton(supabaseClient);
 builder.Services.AddHostedService<FbiScraperService>();
 
 builder.Services.AddScoped<IImageService, ImageService>();
+builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<IFaceRecognitionService, FaceRecognitionService>();
 builder.Services.AddHttpClient(); // <--- CRITIC
 

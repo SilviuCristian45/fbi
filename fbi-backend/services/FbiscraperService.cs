@@ -31,7 +31,7 @@ public class FbiScraperService : BackgroundService
         using var timer = new PeriodicTimer(_period);
 
         // Rulăm imediat prima dată
-        await FetchAndSaveFbiData(stoppingToken);
+        //await FetchAndSaveFbiData(stoppingToken);
 
         // Apoi așteptăm următoarele cicluri
         while (await timer.WaitForNextTickAsync(stoppingToken))

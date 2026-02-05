@@ -127,6 +127,7 @@ export async function uploadFile(file: File): Promise<string> {
 }
 
 import { ReportPagedResult } from "../types/reports"; // Importa tipurile noi
+import { LocationDto } from "../types/location";
 
 // ... (restul codului tau existent) ...
 
@@ -149,4 +150,8 @@ export async function getReports(
   // Presupunem că endpoint-ul din controller-ul C# este 'Reports' sau 'Reports/feed'
   // Ajustează URL-ul '/Reports' dacă ai pus alt nume la Controller
   return authFetch<ReportPagedResult>(`/FbiWanted/reports?${params.toString()}`);
+}
+
+export async function getUserLocation(): Promise<ApiResponse<LocationDto>> {
+  return authFetch<LocationDto>(`/Users`);
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Navbar } from "@/src/components/Navbar";
-import { authFetch } from "@/src/lib/api-client"; // Presupunem că vom avea endpoint-ul
+import { authFetch, getUserLocation } from "@/src/lib/api-client"; // Presupunem că vom avea endpoint-ul
 
 // Import dinamic pentru hartă (fix SSR)
 const MapInner = dynamic(() => import("@/src/components/MapInner"), {
@@ -15,6 +15,28 @@ export default function MyLocationPage() {
     const [position, setPosition] = useState<[number, number] | null>(null);
     const [loading, setLoading] = useState(false);
 
+    useEffect( () => {
+        setLoading(true);
+        try {
+            console.log("Saving Home Location:", position);
+            
+            getUserLocation().then( data => {
+                console.log('locatie user curent')
+                console.log(data.data.latitude + ' ' + data.data.longitude)
+                setPosition([data.data.latitude, data.data.longitude]);
+            }).catch(err => {
+                console.error(err);
+            })
+            
+            
+        } catch (error) {
+            console.error(error);
+            
+        } finally {
+            setLoading(false);
+        }
+    }, [])
+
     // Funcția care trimite datele la backend (o vom lega de endpoint-ul C# mai târziu)
     const handleSetHome = async () => {
         if (!position) return;
@@ -22,12 +44,12 @@ export default function MyLocationPage() {
         try {
             console.log("Saving Home Location:", position);
             
-            // TODO: Aici vom apela API-ul când e gata backend-ul
-            // await authFetch("/User/set-home", { 
-            //    method: "POST", 
-            //    headers: { "Content-Type": "application/json" },
-            //    body: JSON.stringify({ lat: position[0], lng: position[1] }) 
-            // });
+           // TODO: Aici vom apela API-ul când e gata backend-ul
+            await authFetch("/Users", { 
+               method: "POST", 
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({ latitude: position[0], longitude: position[1] }) 
+            });
 
             // Simulare succes
             await new Promise(r => setTimeout(r, 1000));
@@ -95,7 +117,7 @@ export default function MyLocationPage() {
                                 </>
                             ) : (
                                 <>
-                                    🏡 Salvează Locația Home
+                                    🏡 Salvează Locația Manual Home
                                 </>
                             )}
                         </button>

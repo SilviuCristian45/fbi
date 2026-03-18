@@ -44,7 +44,7 @@ public class UsersController : ControllerBase {
         [FromBody] SetUserLocationRequest setUserLocationRequest
     )
     {
-        var keycloakId = User.FindFirstValue(ClaimTypes.NameIdentifier);    
+        var keycloakId = User.FindFirstValue(ClaimTypes.NameIdentifier);
          if (string.IsNullOrEmpty(keycloakId))
          {
             return Unauthorized(ApiResponse<string>.Error("Utilizatorul nu a putut fi identificat."));

@@ -5,6 +5,23 @@ namespace FbiApi.Hubs;
 
 public class SurveilanceHub : Hub
 {
+
+	private readonly Dictionary<string, HashSet<string>> _connections = new();
+
+    public void Add(string userId, string connectionId)
+    {
+        lock (_connections)
+        {
+            if (!_connections.TryGetValue(userId, out HashSet<string>? connections))
+            {
+                connections = new HashSet<string>();
+                _connections.Add(userId, connections);
+            }
+
+            connections.Add(connectionId);
+        }
+    }
+
     public async Task SendMessage(string user, string message)
     {
         // Trimitem mesajul către TOȚI clienții conectați
@@ -16,6 +33,9 @@ public class SurveilanceHub : Hub
     public override async Task OnConnectedAsync()
     {
         var user = Context.User;
+		var userId = user.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+		Console.WriteLine($"User ID: {userId}");
+		this.Add(userId ?? "unknown", Context.ConnectionId);
         Console.WriteLine(user.IsInRole("USER"));
         Console.WriteLine(user.IsInRole("ADMIN"));
 

@@ -185,6 +185,18 @@ public class WantedPersonsService : IWantedPersonsService
 
             await _hubContext.Clients.All.SendAsync("ReceiveLocation", sightingDto);
 
+			foreach (var admin in _context.Users.ToList())
+			{
+				// Notificăm fiecare admin în parte (dacă vrem să trimitem notificare doar unui admin specific, putem adăuga o condiție suplimentară)
+				var distance = CalculateDistance(location.Entity.Latitude, location.Entity.Longitude, admin.Latitude, admin.Longitude);
+				Console.WriteLine($"Distance to admin {admin.UserId}: {distance} km");	
+				if (distance < 10) { // Dacă adminul este la mai puțin de 10 km de locație, trimite notificare
+					Console.WriteLine($"Notifying admin {admin.UserId} about new sighting within {distance} km");
+					await _hubContext.Clients.User(admin.UserId).SendAsync("ReceiveActivity", 
+						$"Agentul {username} a raportat o nouă locație pentru suspectul cu ID-ul {reportLocationRequest.WantedId}!");
+				}
+			}
+
             // ServiceResult<CheckImageFaceRecognitionResponse> result = await _faceRecognitionService.CheckImageFaceRecognitionMatch(reportLocationRequest.FileUrl);
 
             // if (result.Success == false) {
@@ -226,6 +238,22 @@ public class WantedPersonsService : IWantedPersonsService
             return new OperationStatus(false);
         }
     }
+
+	private double CalculateDistance(decimal lat1, decimal lng1, decimal lat2, decimal lng2) {
+		var R = 6371; // Radiusul Pământului în km
+		var dLat = ToRadians((double)(lat2 - lat1));
+		var dLng = ToRadians((double)(lng2 - lng1));
+		var a = 
+			Math.Sin(dLat/2) * Math.Sin(dLat/2) +
+			Math.Cos(ToRadians((double)lat1)) * Math.Cos(ToRadians((double)lat2)) * 
+			Math.Sin(dLng/2) * Math.Sin(dLng/2); 
+		var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1-a)); 
+		return R * c; // Distanța în km
+	}
+
+	private double ToRadians(double angle) {
+		return angle * (Math.PI / 180);
+	}
 
      public async Task<ServiceResult<List<LocationReportDto>>> GetSightings(int id) {
         try {

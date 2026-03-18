@@ -62,7 +62,7 @@ export default function MyLocationPage() {
     };
 
     // Funcția care trimite datele la backend (o vom lega de endpoint-ul C# mai târziu)
-    const handleSetHome = async () => {
+    const  handleSetHome = async () => {
         if (!position) return;
         setLoading(true);
         try {

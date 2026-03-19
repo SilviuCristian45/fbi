@@ -189,7 +189,7 @@ builder.Services.AddScoped<IImageService, ImageService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<IFaceRecognitionService, FaceRecognitionService>();
 builder.Services.AddHttpClient(); // <--- CRITIC
-
+builder.Services.AddSingleton<ConnectionMapping>();
 builder.Services.AddFluentValidationAutoValidation(); // Activează validarea automată înainte de Controller
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 

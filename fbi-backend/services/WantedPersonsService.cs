@@ -25,6 +25,7 @@ public class WantedPersonsService : IWantedPersonsService
 
     private readonly IConfiguration _configuration;
 
+    private readonly ConnectionMapping _connectionMapping;
 
     public WantedPersonsService(
         AppDbContext context, 
@@ -32,12 +33,14 @@ public class WantedPersonsService : IWantedPersonsService
         ILogger<WantedPersonsService> logger,
         IFaceRecognitionService faceRecognitionService,
         ISendEndpointProvider sendEndpointProvider,
-        IConfiguration configuration
+        IConfiguration configuration,
+        ConnectionMapping connectionMapping
     )
     {
         _configuration = configuration;
         _hubContext = hubContext;
         _context = context;
+        _connectionMapping = connectionMapping;
         _logger = logger;
         _faceRecognitionService = faceRecognitionService;
         _sendEndpointProvider = sendEndpointProvider;
@@ -192,8 +195,17 @@ public class WantedPersonsService : IWantedPersonsService
 				Console.WriteLine($"Distance to admin {admin.UserId}: {distance} km");	
 				if (distance < 10) { // Dacă adminul este la mai puțin de 10 km de locație, trimite notificare
 					Console.WriteLine($"Notifying admin {admin.UserId} about new sighting within {distance} km");
-					await _hubContext.Clients.User(admin.UserId).SendAsync("ReceiveActivity", 
-						$"Agentul {username} a raportat o nouă locație pentru suspectul cu ID-ul {reportLocationRequest.WantedId}!");
+					var connections = _connectionMapping.GetConnections(admin.UserId);
+					if (connections.Any()) {
+						Console.WriteLine($"Admin {admin.UserId} is connected with {connections.Count()} connections. Sending notification...");
+						foreach (var connectionId in connections) {
+							Console.WriteLine($"Sending notification to connection {connectionId} of admin {admin.UserId}");
+							await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveActivity", 
+								$"Agentul {username} a raportat o nouă locație la mai putin de 10 km de tine pentru suspectul cu ID-ul {reportLocationRequest.WantedId}!");
+						}
+					} else {
+						Console.WriteLine($"Admin {admin.UserId} is not currently connected. Skipping notification.");
+					}
 				}
 			}
 

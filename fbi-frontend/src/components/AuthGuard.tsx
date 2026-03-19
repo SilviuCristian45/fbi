@@ -53,6 +53,11 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
                         toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
                     });
 
+					conn.on("ReceiveActivity", (msg) => {
+						console.log("Activitate primită:", msg);
+						toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
+					});
+
                     setConnection(conn);
                 } catch (err) {
                     console.error("SignalR Start Error:", err);

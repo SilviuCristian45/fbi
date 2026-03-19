@@ -33,21 +33,11 @@ public class ConnectionMapping
         return Enumerable.Empty<string>();
     }
 
-    public void Remove(string userId, string connectionId)
+    public void Remove(string userId)
     {
         lock (_connections)
         {
-            if (!_connections.TryGetValue(userId, out HashSet<string>? connections))
-            {
-                return;
-            }
-
-            connections.Remove(connectionId);
-
-            if (connections.Count == 0)
-            {
-                _connections.Remove(userId);
-            }
+            _connections.Remove(userId);
         }
     }
 }

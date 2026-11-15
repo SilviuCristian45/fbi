@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+appsettings.Development.json
+.env
+.env.*
+Dockerfile
+.dockerignore

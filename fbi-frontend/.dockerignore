@@ -1,0 +1,13 @@
+# node_modules local (Windows) ar suprascrie pe cel de Linux din imagine
+# si ar strica binarele native (lightningcss/Tailwind 4, sharp)
+node_modules/
+.next/
+# .env local NU trebuie sa intre in build: NEXT_PUBLIC_* vin doar din build args
+.env
+.env.*
+example-env.txt
+screenshots/
+README.md
+Dockerfile
+.dockerignore
+npm-debug.log*

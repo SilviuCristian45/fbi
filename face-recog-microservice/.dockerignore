@@ -1,0 +1,14 @@
+# Mediul virtual local (pe Windows: sute de MB, binare incompatibile cu Linux)
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.deepface/
+# Indexul facial local nu intra in imagine (in Docker sta pe volumul face_index)
+fbi_vectors.pkl*
+# Secrete locale: in container totul vine din env (compose)
+.env
+.env.*
+Dockerfile
+.dockerignore
+readme

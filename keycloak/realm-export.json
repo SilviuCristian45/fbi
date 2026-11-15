@@ -1,0 +1,59 @@
+{
+  "realm": "${KEYCLOAK_REALM}",
+  "displayName": "FBI Surveillance",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 3600,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "USER",
+        "description": "Utilizator standard: vede persoanele cautate, raporteaza locatii"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrator: statistici, rapoarte, listare si creare utilizatori"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "${KEYCLOAK_CLIENT_ID}",
+      "name": "FBI backend (FbiApi)",
+      "description": "Client confidential folosit de backend: password grant la login si service account pentru Admin REST API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KEYCLOAK_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "frontchannelLogout": false,
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-${KEYCLOAK_CLIENT_ID}",
+      "enabled": true,
+      "serviceAccountClientId": "${KEYCLOAK_CLIENT_ID}",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "manage-users",
+          "view-realm"
+        ]
+      }
+    }
+  ]
+}

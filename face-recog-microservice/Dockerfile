@@ -20,6 +20,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Instalăm uvicorn explicit dacă nu e în requirements
 RUN pip install uvicorn
 
+# Logurile apar imediat (fără buffer); malloc cu mai puține arene = vârf de RAM mai mic
+ENV PYTHONUNBUFFERED=1 \
+    MALLOC_ARENA_MAX=2
+
+# Weights-urile Facenet (~92 MB) intră în imagine, ca la runtime să nu depindem de GitHub
+RUN python -c "from deepface import DeepFace; DeepFace.build_model(model_name='Facenet')" \
+    && ls -la /root/.deepface/weights/
+
 COPY . .
 
 EXPOSE 8006

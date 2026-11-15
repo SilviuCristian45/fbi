@@ -1,125 +1,125 @@
 # 🕵️‍♂️ FBI - Advanced Surveillance & Face Recognition System
-This is an educational project/simulation created for portfolio purposes. It is not affiliated with the Federal Bureau of Investigation.
-> **A distributed, event-driven microservices architecture for real-time tracking, reporting, and AI verification of wanted persons.**
+
+This is an educational project/simulation created for portfolio purposes. It is
+not affiliated with the Federal Bureau of Investigation.
+
+> **A distributed, event-driven microservices architecture for real-time
+> tracking, reporting, and AI verification of wanted persons.**
 
 ![Project Status](https://img.shields.io/badge/status-active-success)
-![License](https://img.shields.io/badge/license-MIT-blue)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![Docker](https://img.shields.io/badge/deployment-docker--compose-blue)
 
-## 🎥 Live Demo
-
-
+## 🎥 Demo
 
 https://github.com/user-attachments/assets/ac250e78-cb73-4447-a52b-215ec3430325
 
-Url 🌍 : https://silviu-proiect.space
-
-Accounts:
-
-username: admin
-pass: 1234
-
-username: user
-pass: 1234
-
 ## 🌍 Overview
 
-The **FBI Surveillance System** is a next-generation platform designed to crowdsource intelligence on wanted individuals. It bridges the gap between public reporting and law enforcement verification using advanced AI.
+Users browse wanted persons (imported from the public FBI API) and report
+sightings: a photo plus a location on the map. The photo is analysed
+asynchronously by a face-recognition service (DeepFace / Facenet) against an
+index of known faces. Results and nearby-sighting alerts are pushed to
+connected users in real time over SignalR.
 
-When a user uploads a sighting (photo + location), the system processes the image asynchronously, compares it against a known database of vectors using Deep Learning, and broadcasts real-time alerts to all connected agents if a match is found.
+```mermaid
+flowchart LR
+    browser([Browser]) -- HTTPS --> nginx[nginx]
+    nginx --> frontend[Next.js frontend]
+    nginx -- "/api, /hubs" --> backend[.NET API + SignalR]
+    nginx -- "/upload" --> fileapi[.NET file API]
+    nginx -- "/files" --> s3[(S3 storage<br/>MinIO-compatible)]
+    fileapi --> s3
+    backend --> db[(PostgreSQL)]
+    backend --> kc[Keycloak]
+    backend -- AnalyzeFaceCommand --> mq[(RabbitMQ)]
+    mq --> ai[Python AI<br/>DeepFace]
+    ai -- results --> db
+    ai -- analysis finished --> mq
+    mq --> backend
+```
 
-## 🏗️ Architecture
+The sighting flow, step by step, and every service, port and route are in
+[docs/architecture.md](docs/architecture.md).
 
-The system is built on a **Microservices Architecture** using Docker containers, orchestrated via Docker Compose. It leverages an **Event-Driven** pattern using RabbitMQ to decouple heavy AI processing from the user-facing API.
+## 🛠️ Tech stack
 
-![System Architecture](docs/arhitectura.png)
+| Area | Technology |
+|---|---|
+| Backend API | .NET 9, ASP.NET Core, EF Core (Npgsql), MassTransit, SignalR, FluentValidation, QuestPDF |
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4, react-leaflet, recharts |
+| AI service | Python 3.11, FastAPI, DeepFace (Facenet), TensorFlow, pika |
+| File API | .NET 10 minimal API, AWS S3 SDK |
+| Identity | Keycloak 26 (OIDC) |
+| Messaging | RabbitMQ 3.13 |
+| Storage | PostgreSQL 17, S3-compatible object storage ([Silo](docs/prod/requirements.md#why-silo-and-not-miniominio), a MinIO fork) |
+| Edge | nginx (TLS via Let's Encrypt / certbot) |
+| Deployment | Docker Compose (dev and prod overlays), bash/PowerShell scripts |
 
-### The Data Flow:
-1.  **Ingestion:** User uploads a photo via **Next.js Frontend**.
-2.  **Storage:** **File API** (.NET) uploads the image to **MinIO** (S3 Compatible Storage).
-3.  **Messaging:** The system publishes an `AnalyzeFaceCommand` to **RabbitMQ**.
-4.  **AI Analysis:** The **Python AI Service** consumes the message, downloads the image, and runs Face Recognition (DeepFace/FaceNet).
-5.  **Result:** If a match is found, a result event is published back to the queue.
-6.  **Notification:** The **Main Backend** processes the result and pushes a real-time alert via **SignalR** to all active dashboards.
+## ✨ Key features
 
-## 🛠️ Tech Stack
+- **Centralized authentication** with Keycloak: roles `USER` and `ADMIN`.
+- **Asynchronous face recognition**: RabbitMQ decouples the AI work from the
+  API. Matches use cosine distance on Facenet embeddings.
+- **Real-time updates** over SignalR: new sightings, processed reports, and
+  alerts for users within 10 km of a sighting.
+- **Maps** for sightings and routes, **statistics** and **PDF dossiers** for
+  admins.
+- **Daily import** of wanted persons from the public FBI API.
 
-### Core Services
-* **Backend:** .NET 9 Web API (C#), Entity Framework Core
-* **Frontend:** Next.js 15 (React), TypeScript, Tailwind CSS
-* **AI Engine:** Python 3.10, DeepFace, TensorFlow, Pika (AMQP)
-* **File API:** .NET 10 (Dedicated microservice for MinIO operations)
+## 🚀 Quick start (local development)
 
-### Infrastructure & Data
-* **Database:** PostgreSQL 16
-* **Message Broker:** RabbitMQ
-* **Object Storage:** MinIO (S3 Compatible)
-* **Identity Provider:** Keycloak (OIDC/OAuth2)
-* **Reverse Proxy:** Nginx (SSL Termination & Routing)
-* **Containerization:** Docker & Docker Compose
+Requirements: Docker (Docker Desktop on Windows/macOS) and Git.
 
-## ✨ Key Features
+```bash
+git clone <repo-url> fbi && cd fbi
+cp .env.example .env
+scripts/dev-up.sh            # Windows PowerShell: .\scripts\dev-up.ps1
+```
 
-* **🔐 Enterprise Security:** Centralized authentication via Keycloak (OpenID Connect).
-* **🧠 Deep Learning Recognition:** Uses `Facenet512` model to match faces with high accuracy.
-* **⚡ Real-Time Alerts:** Instant notifications using WebSockets (SignalR).
-* **📂 Scalable Storage:** S3-compatible object storage for handling massive datasets.
-* **📱 Responsive Dashboard:** Modern UI for tracking reports and map locations.
-* **🔄 Resilience:** Automatic retries, dead-letter queues, and container auto-healing.
+Then create a user in Keycloak at http://localhost:18080/admin/ (realm
+`dotnet`; [how](docs/dev/keycloak.md)) and open **http://localhost:8088**.
 
-## 🚀 Getting Started
+Face recognition needs a face index built from the imported FBI data. Once
+the first FBI import has finished (a few minutes after the first start), run
+`scripts/sync-faces.sh --dev --full`. The app lists every imported wanted
+person, but recognises only fugitives, by default the first 100
+(`SYNC_MAX_PERSONS`, `SYNC_INCLUDE_CLASSIFICATIONS`)
+([details](docs/dev/local-setup.md#required-after-the-first-start-fbi-import-then-the-face-index)).
 
-### Prerequisites
-* Docker & Docker Compose
-* Git
-* A valid Domain Name (pointed to your VPS IP)
+The first build takes a while (the AI image includes TensorFlow). More in the
+[development guide](docs/dev/README.md).
 
-### Installation
+## 📚 Documentation
 
-1.  **Clone the repository**
-    ```bash
-    git clone [https://github.com/YourUsername/fbi-surveillance-system.git](https://github.com/YourUsername/fbi-surveillance-system.git)
-    cd fbi-surveillance-system
-    ```
+| | |
+|---|---|
+| [Architecture](docs/architecture.md) | Diagrams, services and ports, sighting → face recognition → SignalR flow, nginx routes, the Python ↔ EF Core coupling |
+| [Development](docs/dev/README.md) | Local setup (Docker and per service), environment variables, Keycloak, EF migrations, manual testing, troubleshooting |
+| [Production](docs/prod/README.md) | VPS requirements, DNS, server setup, TLS, first deploy, Keycloak, admin consoles over SSH, updates and rollback, backup/restore, monitoring, security checklist |
 
-2.  **Configure Environment Variables**
-    Create a `.env` file in the root directory based on the example.
-    ```bash
-    cp .env.example .env
-    ```
-    *Edit `.env` and update the secrets and domain names.*
+HTML versions with navigation and rendered diagrams: run
+`scripts/build-docs.sh` (or `.ps1`), then open `docs/html/index.html`.
 
-3.  **Configure Nginx (Reverse Proxy)**
-    The system uses Nginx to handle routing and SSL.
-    * Navigate to the `nginx/` directory.
-    * Open `default.conf`.
-    * Replace all instances of `silviu-proiect.space` (or the placeholder domain) with your actual domain name.
-    * **SSL Note:** On the very first run, ensure the SSL certificates are generated via Certbot. If running for the first time without certs, you may need to temporarily comment out the SSL server block in `default.conf`.
+## 🗂️ Repository layout
 
-4.  **Run the System**
-    ```bash
-    docker compose up -d --build
-    ```
-
-5.  **Access the Application**
-    * **Frontend:** `https://your-domain.com`
-    * **Keycloak:** `https://your-domain.com/auth`
-    * **MinIO Console:** `https://minio.your-domain.com` (if configured)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-1.  Fork the project.
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the branch (`git push origin feature/AmazingFeature`).
-5.  Open a Pull Request.
+```text
+fbi-backend/               .NET 9 main API (REST, SignalR, EF Core migrations, FBI scraper)
+fbi-frontend/              Next.js frontend
+face-recog-microservice/   Python face-recognition worker (RabbitMQ consumer + FastAPI)
+fbi-media-service/         .NET 10 file upload API (S3)
+nginx/                     nginx image, snippets and dev/prod config templates
+keycloak/                  realm imported on first start
+postgres-init/             creates the Keycloak database on first start
+scripts/                   dev/prod scripts (up, deploy, update, SSL, backup, restore, healthcheck...)
+docs/                      documentation (Markdown sources)
+docker-compose.yaml        shared base; combined with docker-compose.dev.yml or docker-compose.prod.yml
+```
 
 ## 📝 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [LICENSE](LICENSE).
 
 ---
 
-*Built with ❤️ by [Silviu Dinca]*
-
+*Built with ❤️ by Silviu Dinca*

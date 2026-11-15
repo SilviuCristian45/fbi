@@ -1,0 +1,13 @@
+{
+  "name": "fbi-docs-builder",
+  "private": true,
+  "description": "Genereaza docs/html din docs/**/*.md (rulat de scripts/build-docs.sh)",
+  "type": "module",
+  "scripts": {
+    "build": "node build-docs.mjs"
+  },
+  "dependencies": {
+    "marked": "15.0.12",
+    "mermaid": "11.4.1"
+  }
+}

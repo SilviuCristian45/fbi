@@ -71,7 +71,8 @@ public record FbiItem(
     
     // Status
     [property: JsonPropertyName("status")] string? Status,
-    [property: JsonPropertyName("person_classification")] string? PersonClassification
+    [property: JsonPropertyName("person_classification")] string? PersonClassification,
+    [property: JsonPropertyName("poster_classification")] string? PosterClassification
 );
 
 // 3. Obiectul Imagine

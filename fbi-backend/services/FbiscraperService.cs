@@ -11,6 +11,7 @@ public class FbiScraperService : BackgroundService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<FbiScraperService> _logger;
+    private readonly IConfiguration _configuration;
 
     // Rulăm o dată la 24 de ore
     private readonly TimeSpan _period = TimeSpan.FromHours(24); 
@@ -18,11 +19,13 @@ public class FbiScraperService : BackgroundService
     public FbiScraperService(
         IHttpClientFactory httpClientFactory,
         IServiceProvider serviceProvider,
-        ILogger<FbiScraperService> logger)
+        ILogger<FbiScraperService> logger,
+        IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _configuration = configuration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -30,8 +33,11 @@ public class FbiScraperService : BackgroundService
         // Timer care ticăie la intervalul setat
         using var timer = new PeriodicTimer(_period);
 
-        // Rulăm imediat prima dată
-        //await FetchAndSaveFbiData(stoppingToken);
+        // Rulăm imediat prima dată, în funcție de Scraper:RunAtStartup (auto | always | never)
+        if (await ShouldRunAtStartup(stoppingToken))
+        {
+            await FetchAndSaveFbiData(stoppingToken);
+        }
 
         // Apoi așteptăm următoarele cicluri
         while (await timer.WaitForNextTickAsync(stoppingToken))
@@ -40,6 +46,42 @@ public class FbiScraperService : BackgroundService
         }
     }
 
+    // auto (implicit) = doar dacă tabela WantedPersons e goală (bază nouă)
+    private async Task<bool> ShouldRunAtStartup(CancellationToken stoppingToken)
+    {
+        var mode = (_configuration["Scraper:RunAtStartup"] ?? "auto").Trim().ToLowerInvariant();
+
+        switch (mode)
+        {
+            case "always":
+                _logger.LogInformation("Scraper:RunAtStartup=always -> sincronizare la pornire.");
+                return true;
+            case "never":
+                _logger.LogInformation("Scraper:RunAtStartup=never -> prima sincronizare peste 24h.");
+                return false;
+            case "auto":
+                break;
+            default:
+                _logger.LogWarning($"Scraper:RunAtStartup='{mode}' necunoscut, folosesc 'auto'.");
+                break;
+        }
+
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var isEmpty = !await context.WantedPersons.AnyAsync(stoppingToken);
+            _logger.LogInformation(isEmpty
+                ? "Scraper:RunAtStartup=auto, WantedPersons e goală -> sincronizare la pornire."
+                : "Scraper:RunAtStartup=auto, WantedPersons are date -> prima sincronizare peste 24h.");
+            return isEmpty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Nu am putut verifica tabela WantedPersons; sar peste sincronizarea la pornire.");
+            return false;
+        }
+    }
 
 private async Task FetchAndSaveFbiData(CancellationToken stoppingToken)
     {
@@ -109,7 +151,10 @@ private async Task FetchAndSaveFbiData(CancellationToken stoppingToken)
                                 PublicationDate = itemDto.Publication,
                                 ModifiedDate = itemDto.Modified,
                                 Status = itemDto.Status,
-                                Ncic = itemDto.Ncic
+                                Ncic = itemDto.Ncic,
+                                // Folosite de serviciul AI ca să indexeze doar persoanele căutate
+                                PersonClassification = itemDto.PersonClassification,
+                                PosterClassification = itemDto.PosterClassification
                             };
 
                             if (itemDto.Images != null)
@@ -147,6 +192,8 @@ private async Task FetchAndSaveFbiData(CancellationToken stoppingToken)
                         {
                             existingPerson.ModifiedDate = DateTime.UtcNow;
                             existingPerson.Status = itemDto.Status;
+                            existingPerson.PersonClassification = itemDto.PersonClassification;
+                            existingPerson.PosterClassification = itemDto.PosterClassification;
                         }
                     }
 

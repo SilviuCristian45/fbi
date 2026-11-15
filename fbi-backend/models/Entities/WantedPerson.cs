@@ -21,6 +21,7 @@ public class WantedPerson
     // Status & Clasificare
     public string? Status { get; set; } // 'status' (ex: "na", "located")
     public string? PersonClassification { get; set; } // 'person_classification' (ex: "Main", "Victim")
+    public string? PosterClassification { get; set; } // 'poster_classification' (ex: "default", "information", "missing")
     public string? WarningMessage { get; set; } // 'warning_message'
 
     // Recompense

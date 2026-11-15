@@ -250,12 +250,12 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.All
 });
 
-// De obicei Swagger e activat doar în Development (ca să nu expui API-ul public)
-// if (app.Environment.IsDevelopment())
-// {
+// Swagger e activat doar în Development (ca să nu expui API-ul public)
+if (app.Environment.IsDevelopment())
+{
     app.UseSwagger();   // Generează fișierul .json (ex: /swagger/v1/swagger.json)
     app.UseSwaggerUI(); // Generează interfața grafică HTML (ex: /swagger/index.html)
-// }
+}
 
 app.MapHub<SurveilanceHub>("/hubs/surveillance");// Asta va fi adresa ws://localhost:port/hubs/notifications
 // Adaugă linia asta:
@@ -277,6 +277,8 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         Console.WriteLine($"A apărut o eroare la migrare: {ex.Message}");
+        // Oprim aplicația: fără schemă corectă nu are sens să pornim (containerul pică vizibil)
+        throw;
     }
 }
 
@@ -289,6 +291,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => "api c# by silviu");
+
+// Healthcheck pentru Docker (nu e rutat public prin nginx)
+app.MapGet("/health", () => Results.Ok("ok"));
 
 app.MapGet("/public-data", () => "Endpoint public OK");
 app.MapGet("/secure-data", () => "Ai acces la endpoint securizat")

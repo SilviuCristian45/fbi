@@ -83,6 +83,9 @@ app.Use(async (context, next) =>
 
 var appPort = app.Configuration["AppPort"] ?? "7005";
 
+// Healthcheck pentru Docker (nu e rutat public prin nginx)
+app.MapGet("/health", () => Results.Ok("ok"));
+
 // 3. Endpoint Upload
 app.MapPost("/upload", async (IFormFile file, IAmazonS3 s3Client, IConfiguration config) =>
 {

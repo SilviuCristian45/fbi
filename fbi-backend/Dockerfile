@@ -14,6 +14,10 @@ RUN dotnet publish "FbiApi.csproj" -c Release -o /app/publish /p:UseAppHost=fals
 # ETAPA 2: Runtime cu .NET 9.0 (Imaginea mică)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
+
+# curl pentru healthcheck-ul din docker compose
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 
 # Setăm portul intern 7002

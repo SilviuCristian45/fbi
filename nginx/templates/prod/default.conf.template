@@ -1,0 +1,134 @@
+# ============================================================================
+# Nginx PROD - procesat cu envsubst la pornirea containerului.
+# Variabile din env: ${DOMAIN}, ${UPLOAD_MAX_SIZE}
+# Certificatul trebuie sa existe in /etc/letsencrypt/live/${DOMAIN}/
+# (prima data: scripts/init-ssl.sh).
+#
+# NU sunt publicate: consola Keycloak (/admin/), consola MinIO (/minio/),
+# realm-ul master. Acces la ele doar prin tunel SSH (docs/prod).
+# ============================================================================
+
+# Resolver Docker + proxy_pass prin variabile (adresele: snippets/upstream-vars.conf)
+include /etc/nginx/snippets/upstreams.conf;
+
+# WebSocket: "upgrade" doar cand clientul cere upgrade
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# /files/: imaginile (fara SVG, care poate contine scripturi) se afiseaza
+# inline; orice alt tip de fisier primeste Content-Disposition: attachment.
+map $upstream_http_content_type $files_disposition {
+    ~*^image/svg  "attachment";
+    ~*^image/     "";
+    default       "attachment";
+}
+
+server_tokens off;
+
+# ----------------------------------------------------------------------------
+# HTTP :80 - doar ACME challenge (certbot), healthcheck si redirect la HTTPS
+# ----------------------------------------------------------------------------
+server {
+    listen 80;
+    server_name ${DOMAIN} www.${DOMAIN};
+
+    location = /nginx-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://${DOMAIN}$request_uri;
+    }
+}
+
+# ----------------------------------------------------------------------------
+# HTTPS :443
+# ----------------------------------------------------------------------------
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    include /etc/nginx/snippets/upstream-vars.conf;
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # Implicit: request-uri mici (API JSON). /upload are limita proprie.
+    client_max_body_size 2m;
+
+    # --- Keycloak: doar endpoint-urile publice ale realm-ului aplicatiei ----
+    # Login-ul se face server-side (backend -> keycloak:8080); aceste rute
+    # raman pentru discovery OIDC / account console. Realm-ul master (adminii
+    # Keycloak) si consola /admin/ NU sunt expuse.
+    location ^~ /realms/master {
+        return 404;
+    }
+    location /realms/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        proxy_pass $upstream_keycloak;
+    }
+    location /resources/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        proxy_pass $upstream_keycloak;
+    }
+
+    # --- Backend API --------------------------------------------------------
+    location /api/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        proxy_pass $upstream_backend;
+    }
+
+    # --- SignalR (WebSocket + fallback long polling) ------------------------
+    location /hubs/ {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        proxy_pass $upstream_backend;
+        proxy_buffering off;
+        proxy_cache_bypass $http_upgrade;
+        # Conexiunile WebSocket stau deschise mult; SignalR trimite keep-alive la 15s
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+
+    # --- File API (upload poze) ---------------------------------------------
+    location /upload {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        proxy_pass $upstream_file_api;
+        client_max_body_size ${UPLOAD_MAX_SIZE};
+    }
+
+    # --- Fisiere publice din MinIO (/files/<bucket>/<obiect>) ---------------
+    location /files/ {
+        limit_except GET HEAD { deny all; }
+        include /etc/nginx/snippets/proxy-headers.conf;
+        # Slash-ul final elimina prefixul /files/ inainte de MinIO
+        # /files/<bucket>/<obiect> -> /<bucket>/<obiect> la MinIO. Cu proxy_pass
+        # prin variabila, prefixul se elimina cu rewrite (nu cu URI in proxy_pass).
+        rewrite ^/files/(.*)$ /$1 break;
+        proxy_pass $upstream_minio;
+        proxy_buffering off;
+        include /etc/nginx/snippets/files-security.conf;
+        # add_header din location anuleaza mostenirea -> repetam HSTS
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    # --- Frontend Next.js ---------------------------------------------------
+    location / {
+        include /etc/nginx/snippets/proxy-headers.conf;
+        proxy_pass $upstream_frontend;
+    }
+}

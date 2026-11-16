@@ -62,8 +62,8 @@ That user can then create others from the app (`POST /api/Auth/register` with
 
 The import runs only if the realm does not exist. Later changes to
 `realm-export.json` or to `KEYCLOAK_REALM` / `KEYCLOAK_CLIENT_ID` in
-`.env.prod` are **not** applied automatically, and `prod-update.sh` warns when
-`realm-export.json` changes. Apply such changes in the console.
+`.env.prod` are **not** applied automatically, even after a `release-push`
+moves the VPS checkout. Apply such changes in the console.
 
 ### Rotating the client secret
 
@@ -92,7 +92,9 @@ The image is pinned (`quay.io/keycloak/keycloak:26.8.2`). To upgrade:
 1. Read the release notes and the upgrade guide for every version in between.
 2. Take a backup: `scripts/backup.sh` (includes the Keycloak database and a
    realm JSON export).
-3. Change the tag in `docker-compose.yaml`, commit, then run
-   `scripts/prod-update.sh`. Keycloak migrates its database on start.
+3. Change the tag in `docker-compose.yaml`, commit and push, then run
+   `scripts/release-push.sh <user@vps>` from the PC (it moves the VPS checkout;
+   unchanged own images are not resent). `prod-deploy` pulls the new Keycloak
+   image, and Keycloak migrates its database on start.
 4. Downgrading after a schema migration is not supported: restore the backup
    instead.

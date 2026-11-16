@@ -1,6 +1,6 @@
 # Logs and monitoring
 
-The examples use `alias dc='docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod'`.
+The examples use `alias dc='docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod --env-file .env.release'`.
 
 ## Health
 
@@ -70,6 +70,21 @@ Script logs (cron) live in `~/fbi/logs/` and are rotated weekly by logrotate
 | Disk full | `docker system df`, prune build cache/images, check `backups/` and `BACKUP_KEEP` |
 
 ## Rebuilding the face index
+
+Preferred: build it on the PC with the dev stack and push it:
+
+```bash
+# on the PC
+scripts/sync-faces.sh --dev                      # or --dev --full
+scripts/push-face-index.sh deploy@<server-ip>    # replaces the prod index (old one kept as .bak)
+```
+
+`push-face-index.sh` stops python-ai on the VPS, writes `fbi_vectors.pkl` and
+`fbi_vectors.pkl.noface.json` into the prod `face_index` volume through a
+temporary container on the python-ai image, starts python-ai again and prints
+the `/index-status` check.
+
+Alternative, on the VPS:
 
 ```bash
 scripts/sync-faces.sh            # align the index with the first SYNC_MAX_PERSONS persons

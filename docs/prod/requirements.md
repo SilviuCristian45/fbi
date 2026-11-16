@@ -17,22 +17,25 @@ idle after a report analysis; prod usage is similar, light load):
 | file API + nginx + certbot | ~60 MiB | |
 | **Total** | **~2 GB** (peak ~2.2 GB during a sync) | plus the OS |
 
-Building the images **on the server** needs another ~1.5 GB on top: installing
-TensorFlow with pip, `next build` and `dotnet publish`.
+Nothing is built on the server anymore: images are built on the PC and sent
+with `scripts/release-push.sh`. The server needs memory only for the runtime
+(about 2 GB measured), not for pip/TensorFlow, `next build` or
+`dotnet publish`.
 
 | | Minimum | Recommended |
 |---|---|---|
-| RAM | 4 GB + 2–4 GB swap (runtime ~2 GB measured; the swap is for building images on the server) | 8 GB (comfortable builds, room for growth) |
+| RAM | 4 GB (runtime ~2 GB measured, peak ~2.2 GB during a sync) + 2 GB swap as a safety net | 8 GB (room for growth) |
 | CPU | 2 vCPU | 4 vCPU (face analysis is CPU-bound) |
 | Disk | 40 GB SSD | 60 GB+ (images ~8 GB, uploads, backups, logs) |
 | OS | Ubuntu 22.04/24.04 LTS or Debian 12 (x86_64) | |
 
 `scripts/setup-vps.sh` creates a 4 GB swap file automatically when the server
-has less than 8 GB of RAM and no swap. Under 4 GB of RAM, builds and
-TensorFlow may still fail even with swap.
+has less than 8 GB of RAM and no swap. Under 4 GB of RAM, TensorFlow and
+Keycloak may still be OOM-killed even with swap.
 
 Disk usage grows with uploads (MinIO), local backups (`BACKUP_KEEP` × backup
-size) and Docker build cache. `docker system prune` reclaims unused images and
+size) and own images: `release-push` keeps two tags (current + previous) of
+each, so plan for about twice the image sizes below. `docker system prune` reclaims unused images and
 cache. `scripts/healthcheck.sh` warns above 85% disk usage.
 
 ## Network
@@ -42,9 +45,11 @@ cache. `scripts/healthcheck.sh` warns above 85% disk usage.
 - Inbound TCP 22 (SSH), 80 (HTTP, needed for Let's Encrypt and the redirect)
   and 443 (HTTPS). Some providers have their own firewall in the control panel:
   open the same ports there.
-- Outbound internet access: Docker Hub / quay.io (images), npm / PyPI / NuGet
-  (builds), `api.fbi.gov` and FBI image hosts (scraper and face index sync),
-  Let's Encrypt.
+- Outbound internet access: Docker Hub / quay.io (third-party images),
+  `api.fbi.gov` and FBI image hosts (scraper, optional face index sync),
+  Let's Encrypt. npm / PyPI / NuGet are needed only on the PC that builds.
+- Inbound upload from your PC over SSH: the first `release-push` sends every
+  own image (sizes below).
 
 ## Software
 
@@ -53,6 +58,27 @@ git, ufw, openssl, curl. `install-cron.sh` uses cron and logrotate (both
 present by default on Ubuntu/Debian).
 
 ## Images
+
+### Own images (built on the PC, sent over SSH)
+
+Sizes as reported by Docker Desktop for the dev images (Nov 2026,
+uncompressed; containerd store):
+
+| Image | Uncompressed | gzip (first upload) |
+|---|---|---|
+| `fbi/python-ai` | 5.12 GB | TODO: measure with `release-build.sh --measure` |
+| `fbi/frontend` | 1.03 GB | TODO |
+| `fbi/backend` | 507 MB | TODO |
+| `fbi/file-api` | 354 MB | TODO |
+| `fbi/nginx` | 92.7 MB | TODO |
+| **Total** | **~7.1 GB** | TODO |
+
+TODO: estimated first-upload time (gzip total / your upload bandwidth; for
+example 2 GB at 20 Mbit/s ≈ 15 min). Later releases resend only the images
+whose content changed, but always in full. The python-ai image can shrink to
+about 3.9 GB (see `TODO.md`).
+
+### Third-party images
 
 All images are pinned to explicit versions (no `latest`):
 

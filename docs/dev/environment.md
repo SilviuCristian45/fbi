@@ -4,8 +4,9 @@ All configuration lives in one file per environment, at the repository root:
 
 | File | Used by | Template |
 |---|---|---|
-| `.env` | dev stack (`docker-compose.dev.yml`, `scripts/dev-*`) | `.env.example` |
-| `.env.prod` | prod stack (`docker-compose.prod.yml`, `scripts/prod-*`, `init-ssl`, `backup`, ...) | `.env.prod.example` |
+| `.env` | dev stack (`docker-compose.build.yml` + `docker-compose.dev.yml`, `scripts/dev-*`) | `.env.example` |
+| `.env.prod` | prod stack on the VPS (`docker-compose.prod.yml`, `prod-deploy`, `init-ssl`, `backup`, ...) **and** `release-build` / `release-push` on the PC | `.env.prod.example` |
+| `.env.release` | VPS only: `IMAGE_TAG` / `IMAGE_TAG_PREVIOUS`, written by `prod-deploy.sh --tag` (from `release-push`) and `rollback.sh`. Don't edit it by hand. | – |
 
 Both are gitignored. Compose reads them only for **interpolation**: each
 container receives an explicit list of variables in `docker-compose.yaml`, so
@@ -103,6 +104,7 @@ read by an unused method (`GetAdminToken`), so compose doesn't pass them.
 | `IMAGE_MAX_SIDE` | `1280` | Longest side (px) of an image before face detection, for index and report photos. `0` = no downsizing. |
 | `IMAGE_URL_REWRITE` | dev overlay: `${PUBLIC_URL}=>http://nginx`; prod: empty | `public=>internal` prefix rewrite applied when python-ai downloads a report photo. Not in `.env`. |
 | `SYNC_DELAY_MS` | `200` | Pause before each image download during a sync. |
+| `SYNC_RETRY_DELAYS` | `5,15` | Seconds between retries of a failed sync download (network error, HTTP 429 or 5xx; a 404 is not retried). `5,15` = 3 attempts; empty = no retries. |
 | `SYNC_BATCH_SIZE` | `50` | Persons (or images, without a limit) processed between two index saves. |
 | `AI_MEMORY_LIMIT` | `2g` (prod) | Container memory limit. |
 | `KEYCLOAK_MEMORY_LIMIT` | `1g` (prod) | Keycloak container memory limit. The JVM heap is about 70% of it. |
@@ -120,12 +122,17 @@ read by an unused method (`GetAdminToken`), so compose doesn't pass them.
 `DEV_RABBITMQ_AMQP_PORT` (15674), `DEV_RABBITMQ_MGMT_PORT` (15673),
 `DEV_MINIO_API_PORT` (19000), `DEV_MINIO_CONSOLE_PORT` (19001),
 `DEV_BACKEND_PORT` (17002), `DEV_FILE_API_PORT` (17005), `DEV_AI_PORT` (18006),
-`DEV_FRONTEND_PORT` (13000).
+`DEV_FRONTEND_PORT` (13000). All of them are bound to `127.0.0.1` only (not
+reachable from the local network).
 
 ### Prod-only
 
 | Variable | Default | Notes |
 |---|---|---|
+| `IMAGE_PREFIX` | `fbi` | Own images are named `${IMAGE_PREFIX}/<service>:<tag>`. A local name, not a registry: prod sets `pull_policy: never`. Must be the same on the PC and the VPS. |
+| `TARGET_PLATFORM` | `linux/amd64` | Platform `release-build.sh` builds for; `release-push.sh` checks it against `uname -m` on the VPS. |
+| `IMAGE_TAG` | – | Not in `.env.prod`: in `.env.release` on the VPS, or exported by `release-build.sh` (short git hash). Dev images use `dev`. |
+| `HTTP_PORT`, `HTTPS_PORT` | 80, 443 | Host ports of nginx. Change them only to test the prod stack locally next to something else on 80/443; Let's Encrypt needs the real port 80. |
 | `KC_ADMIN_TUNNEL_PORT`, `MINIO_CONSOLE_TUNNEL_PORT`, `RABBITMQ_MGMT_TUNNEL_PORT` | 18080, 19001, 15673 | Bound to `127.0.0.1` on the server, for [SSH tunnels](../prod/admin-consoles.md). |
 | `BACKUP_KEEP` | 7 | Local backups kept by `scripts/backup.sh`. |
 | `BACKUP_REMOTE` | empty | rclone remote (`name:path`) for off-site copies. |

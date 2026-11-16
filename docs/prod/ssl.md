@@ -69,8 +69,10 @@ Let's Encrypt no longer sends expiry emails, so rely on `healthcheck.sh`
 2. Update `DOMAIN` in `.env.prod`.
 3. `scripts/init-ssl.sh`: issues a certificate for the new name, since the
    lineage is per domain.
-4. `scripts/prod-deploy.sh`: rebuilds the frontend, whose URLs are compiled in,
-   and recreates nginx, Keycloak and the file API with the new hostname.
+4. Update `DOMAIN` in the PC's `.env.prod` too, then `scripts/release-build.sh`
+   and `scripts/release-push.sh` from the PC: the frontend is rebuilt, since its
+   URLs are compiled in, and `prod-deploy` recreates nginx, Keycloak and the
+   file API with the new hostname.
 
 Photo URLs already stored in the database still contain the old domain (see
 [Backup and restore](backup-restore.md#restoring-onto-a-different-domain) for

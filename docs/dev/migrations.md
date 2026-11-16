@@ -7,8 +7,8 @@ The backend's schema is managed by EF Core migrations in
 
 `Program.cs` calls `context.Database.Migrate()` at startup, in every
 environment. Pending migrations are applied automatically when the backend
-container starts: after `scripts/dev-up.sh`, `scripts/prod-deploy.sh` or
-`scripts/prod-update.sh`.
+container starts: after `scripts/dev-up.sh` or `scripts/prod-deploy.sh` (run
+by `scripts/release-push.sh` from the PC).
 
 If a migration fails, the exception is logged ("A apărut o eroare la
 migrare: ...") and **rethrown**: the process exits, the container restarts
@@ -71,9 +71,11 @@ mismatch, and reports just stay `Pending`.
 
 ## Production
 
-- Migrations run during `prod-deploy` / `prod-update`, when the new backend
-  container starts.
-- **Take a backup before deploying a migration** (`scripts/backup.sh`).
+- Migrations run during `prod-deploy` (from `release-push`), when the new
+  backend container starts.
+- **Take a backup before deploying a migration**: `release-push.sh --backup`
+  (or `scripts/backup.sh` on the VPS). `scripts/rollback.sh` brings back the old
+  images but not the old schema.
   There are no automated down-migrations. Rolling back a schema change means
   restoring the database backup ([Update and rollback](../prod/update-and-rollback.md)).
 - Prefer additive migrations (new columns nullable or with defaults), so the

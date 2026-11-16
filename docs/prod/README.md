@@ -3,6 +3,14 @@
 How to run the stack on a single public VPS with Docker Compose, TLS from
 Let's Encrypt and only nginx exposed to the internet.
 
+**Nothing is built on the VPS.** The five own images (backend, frontend,
+python-ai, file-api, nginx) are built on your PC with
+`scripts/release-build.sh` and sent over SSH with `scripts/release-push.sh`.
+The face index is also built on the PC and sent with
+`scripts/push-face-index.sh`. The VPS pulls only the third-party images
+(postgres, keycloak, silo, rabbitmq, certbot) and keeps a git checkout for the
+compose files, nginx templates and scripts.
+
 Throughout these pages, `<your-domain>` is the value of `DOMAIN` in
 `.env.prod`, and `deploy` is the non-root user created by `setup-vps.sh`.
 
@@ -12,27 +20,30 @@ Throughout these pages, `<your-domain>` is the value of `DOMAIN` in
 |---|---|---|
 | 1 | Pick a server that is big enough | [Server requirements](requirements.md) |
 | 2 | Point DNS at it, run `scripts/setup-vps.sh` | [DNS and VPS setup](dns-and-vps.md) |
-| 3 | Clone, fill in `.env.prod` | [First deploy](first-deploy.md) |
-| 4 | Get the certificate with `scripts/init-ssl.sh` | [TLS certificates](ssl.md) |
-| 5 | `scripts/prod-deploy.sh` | [First deploy](first-deploy.md) |
-| 6 | Secure Keycloak, create the first admin user | [Keycloak in production](keycloak.md) |
-| 7 | Schedule backups with `scripts/install-cron.sh` | [Backup and restore](backup-restore.md) |
-| 8 | Review the security checklist | [Security checklist](security-checklist.md) |
+| 3 | Clone, fill in `.env.prod` (on the VPS **and** on the PC) | [First deploy](first-deploy.md) |
+| 4 | Get the certificate with `scripts/init-ssl.sh` (VPS) | [TLS certificates](ssl.md) |
+| 5 | Build the face index with the dev stack (PC) | [First deploy](first-deploy.md#3-build-the-face-index-on-the-pc) |
+| 6 | `scripts/release-build.sh`, then `scripts/release-push.sh deploy@<server-ip> --with-index` (PC) | [First deploy](first-deploy.md) |
+| 7 | Secure Keycloak, create the first admin user | [Keycloak in production](keycloak.md) |
+| 8 | Schedule backups with `scripts/install-cron.sh` | [Backup and restore](backup-restore.md) |
+| 9 | Review the security checklist | [Security checklist](security-checklist.md) |
 
 ## Day-to-day operations
 
 | Task | Command | Page |
 |---|---|---|
-| Deploy a new version | `scripts/prod-update.sh` | [Update and rollback](update-and-rollback.md) |
+| Deploy a new version (PC) | `scripts/release-build.sh` + `scripts/release-push.sh <user@vps> --backup` | [Update and rollback](update-and-rollback.md) |
+| Go back to the previous images (VPS) | `scripts/rollback.sh` | [Update and rollback](update-and-rollback.md#rollback) |
+| Redeploy after editing `.env.prod` (VPS) | `scripts/prod-deploy.sh` | [Update and rollback](update-and-rollback.md) |
 | Check health | `scripts/healthcheck.sh` | [Logs and monitoring](logging-monitoring.md) |
 | Logs | `docker compose ... logs -f backend` | [Logs and monitoring](logging-monitoring.md) |
 | Backup / restore | `scripts/backup.sh`, `scripts/restore.sh` | [Backup and restore](backup-restore.md) |
-| Rebuild the face index | `scripts/sync-faces.sh` | [Logs and monitoring](logging-monitoring.md#rebuilding-the-face-index) |
+| Update the face index | PC: `scripts/sync-faces.sh --dev` + `scripts/push-face-index.sh <user@vps>`; or VPS: `scripts/sync-faces.sh` | [Logs and monitoring](logging-monitoring.md#rebuilding-the-face-index) |
 | Admin consoles (Keycloak, MinIO, RabbitMQ) | SSH tunnel | [Admin consoles](admin-consoles.md) |
 | Certificates | automatic; `scripts/init-ssl.sh --status` / `--renew` | [TLS certificates](ssl.md) |
 
 Every script prints its usage with `--help`. All of them stop if `.env.prod`
-is missing, and `prod-deploy` / `init-ssl` / `prod-update` also refuse to run
+is missing, and `prod-deploy` / `init-ssl` / `release-build` also refuse to run
 while `DOMAIN` is still `example.com` or any value is still `CHANGE_ME`.
 
 ### The compose command
@@ -41,12 +52,14 @@ The scripts wrap this command. Use it directly when you need it (for
 `logs`, `exec`, `ps`):
 
 ```bash
-alias dc='docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod'
+alias dc='docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod --env-file .env.release'
 dc ps
 dc logs -f --tail=100 backend
 ```
 
-The examples in these pages use this `dc` alias.
+The examples in these pages use this `dc` alias. `.env.release` holds
+`IMAGE_TAG` (written by `prod-deploy.sh --tag`); it exists after the first
+`release-push`.
 
 ## What runs where
 

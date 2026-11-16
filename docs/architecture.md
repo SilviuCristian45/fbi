@@ -113,10 +113,26 @@ Python service and the frontend expose `GET /health` (the frontend serves it at
 
 | File | Role |
 |---|---|
-| `docker-compose.yaml` | Shared base: services, builds, healthchecks, internal network, volumes. No published ports, no environment-specific values. Each container receives only the variables it needs. |
-| `docker-compose.dev.yml` | Debug ports, Keycloak `start-dev`, HTTP nginx (`nginx/templates/dev`), Swagger on. |
-| `docker-compose.prod.yml` | Only nginx public, Keycloak `start` with `KC_HOSTNAME`, `restart: unless-stopped`, log rotation, memory limits, certbot. |
+| `docker-compose.yaml` | Shared base: services, image names (`${IMAGE_PREFIX:-fbi}/<service>:${IMAGE_TAG:-dev}` for the five own services), healthchecks, internal network, volumes. No `build:`, no published ports, no environment-specific values. Each container receives only the variables it needs. |
+| `docker-compose.build.yml` | The `build:` sections of the five own services (contexts, frontend `NEXT_PUBLIC_*` args derived from `PUBLIC_URL`, OCI revision label). Used by dev and by `scripts/release-build.sh` on the PC, never on the VPS. |
+| `docker-compose.dev.yml` | Debug ports, Keycloak `start-dev`, HTTP nginx (`nginx/templates/dev`), Swagger on. Used together with the build overlay. |
+| `docker-compose.prod.yml` | Own images from `.env.release` (`IMAGE_TAG`) with `pull_policy: never`, only nginx public, Keycloak `start` with `KC_HOSTNAME`, `restart: unless-stopped`, log rotation, memory limits, certbot. |
 | `docker-compose.legacy.yaml` | The old single-file setup, kept temporarily until the new flow is verified. |
+
+### Build and release flow
+
+The VPS never builds anything:
+
+| Where | Step | Compose files |
+|---|---|---|
+| PC | `scripts/dev-up.sh`: dev images `fbi/<service>:dev`, built locally | base + build + dev |
+| PC | `scripts/release-build.sh`: `fbi/<service>:<short-sha>`, from a clean git tree, with the PC's `.env.prod` (`PUBLIC_URL=https://DOMAIN` for the frontend), for `TARGET_PLATFORM` | base + build + prod |
+| PC → VPS | `scripts/release-push.sh`: checks `uname -m` and the VPS commit, sends missing or different images (`docker save \| gzip \| ssh docker load`), runs `prod-deploy.sh --tag` | – |
+| VPS | `scripts/prod-deploy.sh`: checks the images exist, writes `.env.release`, pulls third-party images only, `up -d` | base + prod (+ `--env-file .env.release`) |
+| PC → VPS | `scripts/push-face-index.sh`: index from the dev `face_index` volume into the prod one | – |
+| VPS | `scripts/rollback.sh`: previous `IMAGE_TAG` (images only; the DB schema stays) | base + prod |
+
+Details: [Update and rollback](prod/update-and-rollback.md).
 
 ### Why Silo instead of `minio/minio`
 
@@ -258,8 +274,10 @@ Each run removes index entries outside the selected set (and duplicates),
 then processes the persons without a vector in batches of `SYNC_BATCH_SIZE`
 (default 50), waiting `SYNC_DELAY_MS` (default 200) before each download and
 downsizing images to `IMAGE_MAX_SIDE`, and saves the pickle atomically after
-each batch. The Facenet weights are baked into the image at build time. Images that cannot be downloaded
-count as failed and are retried on the next run. Images without a detectable
+each batch. The Facenet weights are baked into the image at build time. A
+failed download (network error, HTTP 429 or 5xx) is retried in the same run
+after the pauses in `SYNC_RETRY_DELAYS` (default 5 s, then 15 s). Images that
+still cannot be downloaded count as failed and are retried on the next run. Images without a detectable
 face are remembered in `fbi_vectors.pkl.noface.json` and skipped later; a
 person none of whose images has a face is reported as "no face", not as
 missing. The log shows `Progress: X/Y persons processed, A added, F failed,
@@ -267,7 +285,10 @@ N no face` and a final `SYNC FINISHED` line. `GET /index-status` (internal)
 compares the index with the expected set using the same rule; the scripts use
 it. It runs only at startup when `RUN_SYNC_AT_STARTUP=true`;
 `scripts/sync-faces.sh` triggers it on demand and is a required step after the
-first FBI import. `dev-up`, `prod-deploy` and `healthcheck.sh` warn when the
+first FBI import. For production the index is normally built on the PC
+(`scripts/sync-faces.sh --dev --full`) and copied into the prod volume with
+`scripts/push-face-index.sh` (`release-push.sh --with-index`). Entries are
+keyed by FBI image URL, so the same index works against another database. `dev-up`, `prod-deploy` and `healthcheck.sh` warn when the
 index is empty or differs from the expected set.
 
 ## Nginx routing

@@ -1,11 +1,44 @@
 # First deploy
 
-Prerequisites: [DNS and VPS setup](dns-and-vps.md) is done, and you are logged
-in as `deploy` in `~/fbi`.
+> **Status (Nov 2026): the `release-build` → `release-push` flow is not tested
+> end to end.** Tested so far: the compose split (`compose config` for prod has
+> no `build:`), the scripts' error paths, shellcheck, the dev stack built with
+> the build overlay, and the sync download retries. Not tested yet:
+> `release-build.sh` to completion and its sizes, starting the prod stack only
+> from the built images, `push-face-index.sh`, and everything over SSH (no VPS
+> yet). Builds started from an agent's background shell hung after the image
+> was written (the `docker build` client never exited). The same builds work
+> when run from an interactive Git Bash window. Another open risk: images are
+> saved from Docker Desktop's containerd image store and loaded into the VPS's
+> classic store. That should work for single-platform images
+> (`docker save --platform`), but it is unverified. If `docker load` fails on
+> the VPS, enabling the containerd image store there is the fallback
+> (`"features": {"containerd-snapshotter": true}` in `/etc/docker/daemon.json`,
+> then restart Docker; existing images must be reloaded). See `TODO.md`.
 
-## 1. Fill in `.env.prod`
+Nothing is built on the VPS. You build the images and the face index on your
+PC (Windows with Docker Desktop and Git Bash, or Linux) and send them over SSH.
+The VPS only runs them.
+
+Prerequisites:
+
+- [DNS and VPS setup](dns-and-vps.md) is done, and the repository is cloned
+  as `deploy` in `~/fbi` on the VPS.
+- On the PC: Docker Desktop, Git Bash, the same repository at the same commit
+  (pushed to the git remote), and an SSH key login to `deploy@<server-ip>`
+  that works without a password prompt (`ssh deploy@<server-ip> true`).
+- Optional on the PC: `pv`, for a progress bar during uploads.
+
+## 1. Fill in `.env.prod`, in both places
+
+The same file has to exist on the **VPS** (`~/fbi/.env.prod`, used by the
+containers) and on the **PC** (repository root, used by `release-build.sh`).
+`DOMAIN` and `API_KEY_SHARED` are baked into the frontend image, so they must
+be identical in both files. Keep the file out of git (it is in `.gitignore`)
+and copy it with `scp`, not through a chat or a shared drive.
 
 ```bash
+# on the VPS
 cp .env.prod.example .env.prod
 chmod 600 .env.prod
 nano .env.prod
@@ -21,36 +54,88 @@ nano .env.prod
 
   Avoid `$` and `"` in values (compose interpolates them). `MINIO_ROOT_PASSWORD`
   needs at least 8 characters.
+- `TARGET_PLATFORM`: `linux/amd64` for an x86_64 VPS (default), `linux/arm64`
+  for ARM (for example Ampere/Graviton). `release-push` checks it against
+  `uname -m` on the VPS.
 - Leave the rest at their defaults unless you have a reason
   ([Environment variables](../dev/environment.md)).
 
-Write down `KEYCLOAK_ADMIN_PASSWORD`: you need it in step 4.
+Then copy it to the PC (from Git Bash, in the repository root):
 
-## 2. TLS certificate
+```bash
+scp deploy@<server-ip>:fbi/.env.prod .env.prod
+```
+
+Write down `KEYCLOAK_ADMIN_PASSWORD`: you need it in step 6.
+
+## 2. TLS certificate (on the VPS)
 
 ```bash
 scripts/init-ssl.sh
 ```
 
-See [TLS certificates](ssl.md) (`--staging` for a dry run).
+See [TLS certificates](ssl.md) (`--staging` for a dry run). It uses only
+third-party images (certbot, a temporary `nginx:alpine`), so it works before
+any own image is on the server.
 
-## 3. Deploy
+## 3. Build the face index (on the PC)
+
+The face index is not in the repository. Without it every report is analysed
+with 0 matches. Build it with the dev stack on the PC instead of on the VPS:
+the PC is faster, and the sync downloads hundreds of images from fbi.gov.
+
+1. Use the same `SYNC_MAX_PERSONS` and `SYNC_INCLUDE_CLASSIFICATIONS` in
+   `.env` (dev) as in `.env.prod`. The index covers the first
+   `SYNC_MAX_PERSONS` fugitives by `Id` (default 100, one image each).
+2. Start the dev stack and wait for the FBI import:
+
+   ```bash
+   scripts/dev-up.sh
+   scripts/dev-logs.sh backend      # until "Nu mai sunt date. Sincronizare completă."
+   ```
+
+3. Build the index:
+
+   ```bash
+   scripts/sync-faces.sh --dev --full
+   ```
+
+The index lives in the `fbi-dev_face_index` volume. Failed downloads are
+retried in the same run (`SYNC_RETRY_DELAYS`, default 5 s then 15 s), and a
+second `scripts/sync-faces.sh --dev` (without `--full`) picks up whatever
+still failed.
+
+## 4. Build the images (on the PC)
 
 ```bash
-scripts/prod-deploy.sh
+git status                       # must be empty
+scripts/release-build.sh --measure
 ```
 
-What it does:
+This builds `fbi/backend`, `fbi/frontend`, `fbi/python-ai`, `fbi/file-api` and
+`fbi/nginx`, tagged with the short commit hash, and prints their sizes
+(`--measure` adds the gzip size you are about to upload). See
+[Update and rollback](update-and-rollback.md#release-buildsh) for the details.
 
-1. Validates `.env.prod`. It refuses to run if `DOMAIN` is missing or still
-   `example.com`, if any `CHANGE_ME` is left, or if the MinIO password is too
-   short, and it warns if the file is readable by other users.
-2. Checks that the certificate exists in the `letsencrypt` volume.
-3. `docker compose config`, then `build` (the first build takes 10–20 minutes,
-   mostly the AI image), then `up -d`.
-4. Waits until every healthcheck is green (default timeout 15 min,
-   `--timeout`).
-5. Prints `docker compose ps` and the URL.
+## 5. Send and deploy (from the PC)
+
+```bash
+scripts/release-push.sh deploy@<server-ip> --with-index
+```
+
+On a first deploy this:
+
+1. checks the VPS architecture and moves its checkout to the same commit
+   (asks first);
+2. uploads all five images, since none are there yet (see
+   [Server requirements](requirements.md#images) for the size and the time
+   this takes);
+3. runs `scripts/prod-deploy.sh --tag <sha>` on the VPS. That validates
+   `.env.prod`, pulls the third-party images, starts everything and waits for
+   the healthchecks (default timeout 15 min);
+4. `--with-index`: shows how many vectors the local index contains, asks for
+   confirmation, writes it into the production `face_index` volume, restarts
+   python-ai alone and prints the `/index-status` check.
 
 **Database migrations** run automatically when the backend starts
 (`Database.Migrate()` in `Program.cs`). On a fresh database this creates the
@@ -61,7 +146,28 @@ whole schema. If a migration fails, the backend exits and keeps restarting,
 The Keycloak realm is imported from `keycloak/realm-export.json` on this first
 start (realm, roles, client with `KEYCLOAK_CLIENT_SECRET`, service account).
 
-## 4. Keycloak: admin and first users
+### The index check right after the first deploy
+
+The index check compares the index with the production database. Two warnings
+are normal at this point:
+
+- **"Nicio poza de indexat" / empty `WantedImages`**: the production FBI import
+  (`SCRAPER_RUN_AT_STARTUP=auto`, about a minute) hasn't finished yet. Check
+  again later with `scripts/healthcheck.sh` on the VPS.
+- **Orphans or missing persons**: the set is "the first N fugitives by `Id`".
+  IDs come from the import order, and the FBI list changes daily, so the
+  production set can differ slightly from the dev one. Then run
+  `scripts/sync-faces.sh` (without `--full`) **on the VPS**. It is
+  incremental: it downloads only the missing persons and prunes the rest.
+
+### Alternative: build the index on the VPS
+
+If you can't build it on the PC, wait for the production FBI import, then run
+`scripts/sync-faces.sh --full` on the VPS (in `tmux`/`screen`: it takes about
+20 minutes for 100 persons, mostly waiting on fbi.gov). Python-ai peaks at
+about 850 MiB during the sync, within the default `AI_MEMORY_LIMIT=2g`.
+
+## 6. Keycloak: admin and first users
 
 Follow [Keycloak in production](keycloak.md):
 
@@ -71,56 +177,7 @@ Follow [Keycloak in production](keycloak.md):
    `ADMIN` role. Self-registration is off, and `/api/Auth/register` requires an
    ADMIN.
 
-## 5. FBI import and face index (required)
-
-The face index is not in the repository. Until you build it, every report is
-analysed with 0 matches. By default it covers the first 100 wanted persons
-(`SYNC_MAX_PERSONS`).
-
-1. **Wait for the FBI import.** On a fresh database the backend starts it
-   automatically (`SCRAPER_RUN_AT_STARTUP=auto`). It is finished when this
-   shows `Nu mai sunt date. Sincronizare completă.`:
-
-   ```bash
-   dc logs backend | grep -E "Începe sincronizarea|Salvat pagina|Sincronizare completă|Eroare la apelul FBI|A crăpat"
-   ```
-
-   (`alias dc='docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod'`)
-2. **Build the index:**
-
-   ```bash
-   scripts/sync-faces.sh --full
-   ```
-
-   Run it in `tmux`/`screen` or with `nohup` so an SSH disconnect doesn't stop
-   the wait (the sync itself runs inside the container and continues either
-   way). While it runs, new reports wait in RabbitMQ and are analysed after.
-
-Sizing, measured on the dev stack in Nov 2026 (FBI list: 1,275 persons,
-3,065 images, 1,434 of them fugitive posters; 8 vCPU laptop, slow home
-connection):
-
-| Step | Measured | Memory |
-|---|---|---|
-| FBI import (backend) | 62 s (64 pages) | backend's normal usage |
-| `sync-faces --full`, `SYNC_MAX_PERSONS=100` (default, fugitives only) | 18 min 39 s total: 66 persons indexed, 0 without any detectable face (5 images without a face were replaced by the person's next image), 34 failed (fbi.gov timeouts / HTML instead of an image; retried by the next run). Mostly waiting on fbi.gov downloads (10 s timeout), CPU idle most of the time. | python-ai peak **850 MiB** |
-| `sync-faces --full`, `SYNC_MAX_PERSONS=0` (all images) | not measured; extrapolated several hours | same order as above |
-
-The FBI import brings in **all** wanted persons (the list, details, PDF
-dossiers), but only fugitives are **recognised** in sighting photos
-(`SYNC_INCLUDE_CLASSIFICATIONS`: no seeking-information, missing-person,
-victim or ViCAP posters), and of those only the first `SYNC_MAX_PERSONS`
-(by `Id`, one image each). Set it to `0` (or empty) to index
-every image, at the cost of a much longer sync.
-
-**Memory:** the measured peak (850 MiB) fits the default
-`AI_MEMORY_LIMIT=2g` on a 4 GB VPS. If python-ai is OOM-killed anyway, the
-index saved so far is kept (after every `SYNC_BATCH_SIZE` persons) and the
-next run continues from there. Run `scripts/sync-faces.sh` (without `--full`)
-again later to pick up the persons whose downloads failed; fbi.gov often
-times out or answers with an HTML page instead of the image.
-
-## 6. Verify
+## 7. Verify (on the VPS)
 
 ```bash
 scripts/healthcheck.sh
@@ -128,15 +185,16 @@ scripts/healthcheck.sh
 
 It must report every service healthy, a consumer on both RabbitMQ queues,
 the face index in step with `"WantedImages"`, HTTP → HTTPS working, and the
-certificate's days left. Then open
-`https://<your-domain>` and log in with the ADMIN user.
+certificate's days left. Then open `https://<your-domain>` and log in with the
+ADMIN user.
 
 After the first import the backend refreshes the wanted persons every 24 h.
-New FBI images are not indexed automatically: run `scripts/sync-faces.sh`
-(without `--full`) from time to time, or when `healthcheck.sh` reports missing
+New FBI images are not indexed automatically: rebuild the index on the PC and
+push it with `scripts/push-face-index.sh deploy@<server-ip>`, or run
+`scripts/sync-faces.sh` on the VPS when `healthcheck.sh` reports missing
 images.
 
-## 7. Backups and cron
+## 8. Backups and cron (on the VPS)
 
 ```bash
 scripts/backup.sh                         # first backup, by hand
@@ -145,7 +203,12 @@ scripts/install-cron.sh --with-healthcheck
 
 See [Backup and restore](backup-restore.md).
 
-## 8. Security review
+## 9. Security review
 
 Go through the [security checklist](security-checklist.md), especially the
 pending items, which are known risks that are not fixed yet.
+
+## Next releases
+
+See [Update and rollback](update-and-rollback.md): `release-build`, then
+`release-push --backup`.

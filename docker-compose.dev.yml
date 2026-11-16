@@ -1,7 +1,9 @@
 # ============================================================================
 # OVERLAY DEV (local, Windows/Linux cu Docker Desktop)
-#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml --env-file .env up -d --build
+#   docker compose -f docker-compose.yaml -f docker-compose.build.yml -f docker-compose.dev.yml --env-file .env up -d --build
 #   (sau scripts/dev-up.ps1 / scripts/dev-up.sh)
+#
+# - imaginile se construiesc local (docker-compose.build.yml), tag implicit "dev"
 #
 # - nginx pe HTTP simplu, publicat pe ${DEV_HTTP_PORT} (implicit 8088)
 # - porturi de debug pe host cu default-uri care NU se bat cu containerele
@@ -42,11 +44,6 @@ services:
       - "${DEV_BACKEND_PORT:-17002}:7002"
 
   frontend:
-    build:
-      args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_URL:?}/api
-        NEXT_PUBLIC_WEBSOCKETS_URL: ${PUBLIC_URL:?}/hubs/surveillance
-        NEXT_PUBLIC_FILE_API: ${PUBLIC_URL:?}/upload
     ports:
       - "${DEV_FRONTEND_PORT:-13000}:3000"
 

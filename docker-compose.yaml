@@ -2,9 +2,14 @@
 # BAZA COMUNA (dev + prod)
 #
 # Nu se ruleaza singur. Se combina mereu cu un overlay:
-#   dev : docker compose -f docker-compose.yaml -f docker-compose.dev.yml  --env-file .env      up -d --build
-#   prod: docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   dev : docker compose -f docker-compose.yaml -f docker-compose.build.yml -f docker-compose.dev.yml --env-file .env up -d --build
+#   prod: docker compose -f docker-compose.yaml -f docker-compose.prod.yml --env-file .env.prod --env-file .env.release up -d
 # (scripturile din scripts/ fac asta pentru tine)
+#
+# Imaginile proprii (backend, frontend, python-ai, file-api, nginx) se numesc
+# ${IMAGE_PREFIX}/<serviciu>:${IMAGE_TAG}. Aici nu exista `build:`: sectiunile
+# de build sunt in docker-compose.build.yml (dev + scripts/release-build.sh).
+# Pe VPS nu se construieste nimic; imaginile vin de pe PC (scripts/release-push.sh).
 #
 # Aici NU exista porturi publicate si nici valori specifice unui mediu
 # (URL-uri publice, domeniu, comanda Keycloak, restart policy, logging).
@@ -134,8 +139,7 @@ services:
   # (Database.Migrate()); daca migrarea esueaza, procesul se opreste.
   # --------------------------------------------------------------------------
   backend:
-    build:
-      context: ./fbi-backend
+    image: ${IMAGE_PREFIX:-fbi}/backend:${IMAGE_TAG:-dev}
     environment:
       ASPNETCORE_URLS: "http://+:7002"
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${DB_NAME:?};Username=${DB_USER:?};Password=${DB_PASSWORD:?}"
@@ -181,15 +185,12 @@ services:
       start_period: 120s
 
   # --------------------------------------------------------------------------
-  # Frontend Next.js. NEXT_PUBLIC_* sunt BUILD ARGS (ajung in bundle-ul JS):
-  # orice schimbare cere rebuild (docker compose ... up -d --build frontend).
-  # URL-urile vin din overlay; cheia de upload e mereu == API_KEY_SHARED.
+  # Frontend Next.js. NEXT_PUBLIC_* sunt BUILD ARGS (ajung in bundle-ul JS,
+  # vezi docker-compose.build.yml): orice schimbare cere rebuild
+  # (dev: scripts/dev-up.sh frontend; prod: release-build + release-push).
   # --------------------------------------------------------------------------
   frontend:
-    build:
-      context: ./fbi-frontend
-      args:
-        NEXT_PUBLIC_FILE_API_KEY: ${API_KEY_SHARED:?}
+    image: ${IMAGE_PREFIX:-fbi}/frontend:${IMAGE_TAG:-dev}
     networks:
       - app_network
     healthcheck:
@@ -203,8 +204,7 @@ services:
   # Serviciul AI (DeepFace). Scrie direct in tabelele EF din Postgres.
   # --------------------------------------------------------------------------
   python-ai:
-    build:
-      context: ./face-recog-microservice
+    image: ${IMAGE_PREFIX:-fbi}/python-ai:${IMAGE_TAG:-dev}
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -252,8 +252,7 @@ services:
   # File API (upload -> MinIO). URL-ul public al fisierelor vine din overlay.
   # --------------------------------------------------------------------------
   file-api:
-    build:
-      context: ./fbi-media-service
+    image: ${IMAGE_PREFIX:-fbi}/file-api:${IMAGE_TAG:-dev}
     environment:
       AppPort: "7005"
       Minio__Url: http://minio:9000
@@ -275,12 +274,12 @@ services:
 
   # --------------------------------------------------------------------------
   # Nginx - imagine proprie (nginx/Dockerfile): snippets + reload periodic.
+  # Template-urile NU sunt in imagine: pe VPS vin din checkout-ul git.
   # Config-ul vine din nginx/templates/<mediu>/ (montat de overlay) si e
   # procesat cu envsubst de entrypoint-ul imaginii oficiale.
   # --------------------------------------------------------------------------
   nginx:
-    build:
-      context: ./nginx
+    image: ${IMAGE_PREFIX:-fbi}/nginx:${IMAGE_TAG:-dev}
     environment:
       UPLOAD_MAX_SIZE: ${UPLOAD_MAX_SIZE:-20m}
     depends_on:

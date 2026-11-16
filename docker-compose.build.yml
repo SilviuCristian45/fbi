@@ -1,0 +1,50 @@
+# ============================================================================
+# OVERLAY BUILD - cum se construiesc imaginile proprii
+#
+# Folosit de:
+#   - dev: base + build + dev (scripts/dev-up.*), imagini ${IMAGE_PREFIX}/*:dev
+#   - release: scripts/release-build.sh, pe PC, cu .env.prod LOCAL:
+#       base + build + prod, IMAGE_TAG=<git-sha-scurt>, PUBLIC_URL=https://DOMAIN
+# NU se foloseste pe VPS: acolo compose = base + prod, fara niciun `build:`.
+#
+# PUBLIC_URL: in dev vine din .env; la release il exporta release-build.sh
+# (variabilele din shell au prioritate fata de --env-file).
+# GIT_SHA: commit-ul din care s-a construit imaginea (label OCI), setat de
+# release-build.sh; in dev ramane "dev".
+# ============================================================================
+
+x-labels: &labels
+  org.opencontainers.image.revision: ${GIT_SHA:-dev}
+  org.opencontainers.image.source: fbi
+
+services:
+  backend:
+    build:
+      context: ./fbi-backend
+      labels: *labels
+
+  frontend:
+    build:
+      context: ./fbi-frontend
+      labels: *labels
+      # NEXT_PUBLIC_* ajung in bundle-ul JS: schimbarea lor cere rebuild
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL:?}/api
+        NEXT_PUBLIC_WEBSOCKETS_URL: ${PUBLIC_URL:?}/hubs/surveillance
+        NEXT_PUBLIC_FILE_API: ${PUBLIC_URL:?}/upload
+        NEXT_PUBLIC_FILE_API_KEY: ${API_KEY_SHARED:?}
+
+  python-ai:
+    build:
+      context: ./face-recog-microservice
+      labels: *labels
+
+  file-api:
+    build:
+      context: ./fbi-media-service
+      labels: *labels
+
+  nginx:
+    build:
+      context: ./nginx
+      labels: *labels

@@ -8,6 +8,8 @@ certbot/logs/
 .env
 .env.local
 .env.prod
+# Tag-ul imaginilor curente/anterioare pe VPS (scris de scripts/release-push.sh)
+.env.release
 .env.*.local
 *.pem
 *.key

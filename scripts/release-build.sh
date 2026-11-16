@@ -20,6 +20,10 @@ Pasi:
      pentru TARGET_PLATFORM (implicit linux/amd64; buildx daca difera de PC)
   4. afiseaza dimensiunile imaginilor
 
+Context, Dockerfile, build args si labels vin din docker-compose.build.yml
+(compose config --format json, citit cu Python 3); build-ul e `docker build`
+(`docker buildx build --load` pentru alta platforma), nu `compose build`.
+
 Tag: <git-sha-scurt> (ex. fbi/backend:1a2b3c4); cu --allow-dirty: <sha>-dirty.
 
 Optiuni:
@@ -52,7 +56,7 @@ done
 require_docker
 require_cmd git
 use_env prod
-# Build = base + build + prod; IMAGE_TAG vine din shell, nu din .env.release
+# Configuratia de build = base + build + prod; IMAGE_TAG vine din shell, nu din .env.release
 OVERLAY_FILES=(docker-compose.build.yml docker-compose.prod.yml)
 RELEASE_FILE=""
 
@@ -72,21 +76,71 @@ if [[ "$PLATFORM" != "$LOCAL_PLATFORM" ]]; then
   warn "Build cross-platform $LOCAL_PLATFORM -> $PLATFORM prin buildx (emulare QEMU, mult mai lent)."
 fi
 
+# Sursa de adevar pentru context/Dockerfile/args/labels: docker-compose.build.yml,
+# interpolat de compose (base + build + prod, cu variabilele de mai jos).
+# Build-ul insusi NU trece prin compose (`compose build` se agata uneori dupa
+# ce imaginea e gata): `docker build` direct, cate un serviciu pe rand.
 export IMAGE_TAG="$TAG"
 GIT_SHA="$(git rev-parse HEAD)"; export GIT_SHA
 export PUBLIC_URL="https://$DOMAIN"
-export DOCKER_DEFAULT_PLATFORM="$PLATFORM"
 
-compose config -q || die "docker compose config a esuat (vezi eroarea de mai sus)."
+PY=""
+for c in python3 python; do
+  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import json' >/dev/null 2>&1; then PY="$c"; break; fi
+done
+[[ -n "$PY" ]] || die "Lipseste Python 3 (folosit pentru a citi configuratia de build din compose config --format json)."
 
-build_args=(build)
-(( NO_CACHE )) && build_args+=(--no-cache)
+# Linii "serviciu<US>tip<US>cheie<US>valoare" (tip: context, dockerfile, target, arg, label).
+# Separator \x1f (unit separator), nu tab: tab-ul e spatiu alb pentru IFS si
+# doua tab-uri consecutive (cheie goala) s-ar contopi la `read`.
+specs="$(compose config --format json | "$PY" -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+for name in sys.argv[1:]:
+    b = services.get(name, {}).get("build")
+    if not b:
+        sys.exit("Serviciul %s nu are build in docker-compose.build.yml" % name)
+    rows = [("context", "", b["context"]), ("dockerfile", "", b.get("dockerfile") or "Dockerfile")]
+    if b.get("target"):
+        rows.append(("target", "", b["target"]))
+    for kind, key in (("arg", "args"), ("label", "labels")):
+        rows += [(kind, k, "" if v is None else str(v)) for k, v in (b.get(key) or {}).items()]
+    for kind, k, v in rows:
+        if "\x1f" in v or "\n" in v:
+            sys.exit("Valoare nesuportata (newline) pentru %s.%s" % (name, k))
+        print("\x1f".join((name, kind, k, v)))
+' "${OWN_SERVICES[@]}" | tr -d '\r')" || die "Nu pot citi configuratia de build (docker compose config)."
+
+# --progress=plain si stdin din /dev/null: fara ele, clientul docker build
+# ramanea uneori agatat dupa ce imaginea era gata (rulare fara terminal).
+if [[ "$PLATFORM" != "$LOCAL_PLATFORM" ]]; then
+  builder=(docker buildx build --progress=plain --platform "$PLATFORM" --load)
+else
+  builder=(docker build --progress=plain --platform "$PLATFORM")
+fi
+(( NO_CACHE )) && builder+=(--no-cache)
+
 start=$SECONDS
-# Cate un serviciu pe rand: `compose build` cu mai multe servicii trece prin
-# `buildx bake`, care le construieste in paralel (ignora COMPOSE_PARALLEL_LIMIT).
 for s in "${OWN_SERVICES[@]}"; do
-  info "Construiesc $(own_image "$s" "$TAG") pentru $PLATFORM..."
-  compose "${build_args[@]}" "$s"
+  img="$(own_image "$s" "$TAG")"
+  context=""; dockerfile=""; extra=()
+  while IFS=$'\x1f' read -r svc kind key val; do
+    [[ "$svc" == "$s" ]] || continue
+    case "$kind" in
+      context) context="$val" ;;
+      dockerfile) dockerfile="$val" ;;
+      target) extra+=(--target "$val") ;;
+      arg) extra+=(--build-arg "$key=$val") ;;
+      label) extra+=(--label "$key=$val") ;;
+    esac
+  done <<<"$specs"
+  [[ -n "$context" ]] || die "Lipseste contextul de build pentru $s."
+  # Dockerfile relativ la context (ca in compose), daca nu e absolut
+  [[ "$dockerfile" == /* || "$dockerfile" =~ ^[A-Za-z]: ]] || dockerfile="$context/$dockerfile"
+  info "Construiesc $img pentru $PLATFORM..."
+  s_start=$SECONDS
+  "${builder[@]}" -t "$img" -f "$dockerfile" "${extra[@]}" "$context" </dev/null     || die "Build-ul $s a esuat."
+  ok "$img ($((SECONDS - s_start))s)"
 done
 ok "Build terminat in $((SECONDS - start))s."
 

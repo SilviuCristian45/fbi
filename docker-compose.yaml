@@ -222,6 +222,8 @@ services:
       # Fara ":" intentionat: nesetat = 100, gol = fara limita
       SYNC_MAX_PERSONS: ${SYNC_MAX_PERSONS-100}
       SYNC_DELAY_MS: ${SYNC_DELAY_MS:-200}
+      # Pauze (s) intre reincercarile unei descarcari esuate; fara ":" intentionat: gol = fara reincercari
+      SYNC_RETRY_DELAYS: ${SYNC_RETRY_DELAYS-5,15}
       # Gol = default-ul din main.py (doar persoanele cautate); "*" = toate afisele
       SYNC_INCLUDE_CLASSIFICATIONS: ${SYNC_INCLUDE_CLASSIFICATIONS:-}
       IMAGE_MAX_SIDE: ${IMAGE_MAX_SIDE:-1280}

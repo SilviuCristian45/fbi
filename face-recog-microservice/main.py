@@ -56,6 +56,26 @@ SYNC_BATCH_SIZE = env_int("SYNC_BATCH_SIZE", 50, minimum=1)
 SYNC_MAX_PERSONS = env_int("SYNC_MAX_PERSONS", 100)
 # Pauză între descărcări, ca să nu încărcăm serverele FBI
 SYNC_DELAY_MS = env_int("SYNC_DELAY_MS", 200)
+
+def env_delays(name, default):
+    """Secunde separate prin virgulă. Nesetată = default; goală = fără reîncercări; invalidă = default."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    delays = []
+    for part in raw.split(","):
+        if not part.strip():
+            continue
+        try:
+            delays.append(max(0.0, float(part)))
+        except ValueError:
+            print(f"⚠️ {name}='{raw}' invalid, folosesc {default}.")
+            return default
+    return delays
+
+# Pauzele dintre reîncercările unei descărcări eșuate din sync (eroare de rețea, 429, 5xx).
+# Implicit 5s, apoi 15s: 3 încercări, ca un sync să nu lase persoane fără vector din cauza unei erori trecătoare
+SYNC_RETRY_DELAYS = env_delays("SYNC_RETRY_DELAYS", [5, 15])
 # Ce afișe FBI (poster_classification) sunt indexate: implicit doar persoanele căutate.
 # Cu o listă se exclud și victimele (person_classification) și afișele ViCAP
 # (dispăruți, neidentificați). "*" = toate afișele, fără niciun filtru.
@@ -198,16 +218,27 @@ def download_image(u_orig, u_large):
     """Descarcă poza (originală, apoi large). Întoarce (bytes_comprimați, url) sau (None, url_original)."""
     def get_bytes(u):
         if not u: return None
-        time.sleep(SYNC_DELAY_MS / 1000)
-        try:
-            with requests.Session() as s:
-                resp = s.get(u, impersonate="chrome110", allow_redirects=True, timeout=10)
-                if resp.status_code != 200: return None
-                ct = resp.headers.get("content-type", "").lower()
-                if "text" in ct or "html" in ct: return None
-                return np.frombuffer(resp.content, dtype=np.uint8)
-        except Exception:
-            return None
+        reason = ""
+        for attempt, delay in enumerate([0] + SYNC_RETRY_DELAYS):
+            if attempt:
+                print(f"   ↻ Reîncerc ({attempt}/{len(SYNC_RETRY_DELAYS)}) peste {delay:g}s după {reason}: {u}")
+                time.sleep(delay)
+            time.sleep(SYNC_DELAY_MS / 1000)
+            try:
+                with requests.Session() as s:
+                    resp = s.get(u, impersonate="chrome110", allow_redirects=True, timeout=10)
+                    # Erori trecătoare: se reîncearcă; 404/403 etc. nu
+                    if resp.status_code == 429 or resp.status_code >= 500:
+                        reason = f"HTTP {resp.status_code}"
+                        continue
+                    if resp.status_code != 200: return None
+                    ct = resp.headers.get("content-type", "").lower()
+                    if "text" in ct or "html" in ct: return None
+                    return np.frombuffer(resp.content, dtype=np.uint8)
+            except Exception as e:
+                reason = type(e).__name__
+        print(f"   ✗ Descărcare eșuată după {len(SYNC_RETRY_DELAYS) + 1} încercări ({reason}): {u}")
+        return None
 
     img_bytes = get_bytes(u_orig)
     if img_bytes is not None:

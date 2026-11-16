@@ -18,6 +18,8 @@ serviciul sincronizeaza indexul cu "WantedImages":
     descarcari, si salveaza indexul dupa fiecare lot. Pozele care nu se pot
     descarca sunt numarate ca esuate si reincercate la rularea urmatoare;
     cele fara fata sunt retinute si sarite.
+La final copiaza raportul per poza (INDEXAT / FARA_FATA / DESCARCARE_ESUATA
+cu motivul, de ex. HTTP 403 / EROARE_AI) in logs/sync-faces/<env>-sync-*.log.
 Apoi recreeaza containerul cu valoarea din fisierul env, ca restarturile
 ulterioare sa nu mai refaca sincronizarea.
 
@@ -127,6 +129,26 @@ failed_lines="$(grep -cE "Download failed|AI Failed" <<<"$logs" || true)"
 noface_lines="$(grep -c "No face" <<<"$logs" || true)"
 (( failed_lines > 0 )) && info "Poze esuate (reincercate la rularea urmatoare): $failed_lines; detalii: logs python-ai | grep -E 'Download failed|AI Failed'"
 (( noface_lines > 0 )) && info "Poze fara fata detectabila (sarite): $noface_lines"
+
+# Raportul per poza (scris de serviciu pe volumul indexului) -> logs/sync-faces/ local
+report_path="$(sed -n 's/.* Report: \(.*\)$/\1/p' <<<"$result" | tail -n 1)"
+if [[ -n "$report_path" ]]; then
+  report_dir="$ROOT_DIR/logs/sync-faces"
+  mkdir -p "$report_dir"
+  local_report="$report_dir/$ENV_NAME-$(basename "$report_path")"
+  if compose cp "python-ai:$report_path" "$(host_path "$local_report")" >/dev/null 2>&1; then
+    info "Raport per poza: $local_report"
+    for status in INDEXAT FARA_FATA DESCARCARE_ESUATA EROARE_AI; do
+      n="$(grep -cE "  $status +persoana " "$local_report" || true)"
+      (( n > 0 )) && printf '    %-18s %s\n' "$status" "$n"
+    done
+    reasons="$(grep -oE '  DESCARCARE_ESUATA +persoana .*' "$local_report" | grep -oE 'original: [^;)]+' \
+      | sort | uniq -c | sort -rn || true)"
+    [[ -n "$reasons" ]] && { info "Motive descarcari esuate (poza originala):"; sed 's/^/    /' <<<"$reasons"; }
+  else
+    warn "Nu pot copia raportul din container ($report_path)."
+  fi
+fi
 
 # --- 4. Revenim la setarile normale ---------------------------------------------------
 info "Repornesc python-ai cu setarile normale (indexul se incarca de pe volum)..."

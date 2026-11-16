@@ -96,8 +96,11 @@ you to wait for the FBI import) and warns if the import still seems to be
 running. Then it recreates `python-ai` with `RUN_SYNC_AT_STARTUP=true`, prints
 the progress and waits for the `SYNC FINISHED` log line (the API and its
 healthcheck come up only after the sync, so the container may show
-`unhealthy` meanwhile). Then it prints a summary (added, removed, failed) and
-recreates the container with the normal setting. Default timeout: 2 h
+`unhealthy` meanwhile). Then it prints a summary (added, removed, failed),
+copies the per-image report (one line per image tried: indexed, no face, or
+download failed with the reason, e.g. `HTTP 403`) to
+`logs/sync-faces/<env>-sync-<timestamp>.log`, prints the count per status and
+the download failure reasons, and recreates the container with the normal setting. Default timeout: 2 h
 (`--timeout`). The
 index lives on the `face_index` volume, so it survives restarts and
 redeploys. Analysis is paused during the sync, and incoming reports wait in

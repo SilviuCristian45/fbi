@@ -94,6 +94,10 @@ if IMAGE_URL_REWRITE and "=>" not in IMAGE_URL_REWRITE:
     print(f"⚠️ IMAGE_URL_REWRITE='{IMAGE_URL_REWRITE}' invalid (format: public=>intern), îl ignor.")
     IMAGE_URL_REWRITE = ""
 
+# Rapoartele sync-ului (o linie per poză); implicit lângă index, pe același volum
+SYNC_REPORT_DIR = os.getenv("SYNC_REPORT_DIR") or os.path.join(os.path.dirname(DB_FILE) or ".", "sync-reports")
+SYNC_REPORT_KEEP = env_int("SYNC_REPORT_KEEP", 20, minimum=1)
+
 vector_db = []
 no_face_urls = set()
 
@@ -215,9 +219,9 @@ def save_index():
     os.replace(NO_FACE_FILE + ".tmp", NO_FACE_FILE)
 
 def download_image(u_orig, u_large):
-    """Descarcă poza (originală, apoi large). Întoarce (bytes_comprimați, url) sau (None, url_original)."""
+    """Descarcă poza (originală, apoi large).
+    Întoarce (bytes_comprimați, url, None) sau (None, url_original, motivul eșecului)."""
     def get_bytes(u):
-        if not u: return None
         reason = ""
         for attempt, delay in enumerate([0] + SYNC_RETRY_DELAYS):
             if attempt:
@@ -231,36 +235,86 @@ def download_image(u_orig, u_large):
                     if resp.status_code == 429 or resp.status_code >= 500:
                         reason = f"HTTP {resp.status_code}"
                         continue
-                    if resp.status_code != 200: return None
+                    if resp.status_code != 200: return None, f"HTTP {resp.status_code}"
                     ct = resp.headers.get("content-type", "").lower()
-                    if "text" in ct or "html" in ct: return None
-                    return np.frombuffer(resp.content, dtype=np.uint8)
+                    if "text" in ct or "html" in ct: return None, f"content-type {ct or '?'}"
+                    return np.frombuffer(resp.content, dtype=np.uint8), None
             except Exception as e:
                 reason = type(e).__name__
         print(f"   ✗ Descărcare eșuată după {len(SYNC_RETRY_DELAYS) + 1} încercări ({reason}): {u}")
-        return None
+        return None, f"{reason} după {len(SYNC_RETRY_DELAYS) + 1} încercări"
 
-    img_bytes = get_bytes(u_orig)
+    img_bytes, reason = get_bytes(u_orig)
     if img_bytes is not None:
-        return img_bytes, u_orig
+        return img_bytes, u_orig, None
+    reasons = [f"original: {reason}"]
     if u_large:
-        img_bytes = get_bytes(u_large)
+        img_bytes, reason = get_bytes(u_large)
         if img_bytes is not None:
-            return img_bytes, u_large
-    return None, u_orig
+            return img_bytes, u_large, None
+        reasons.append(f"large: {reason}")
+    return None, u_orig, "; ".join(reasons)
+
+class SyncReport:
+    """Raportul unui sync: o linie per poză încercată (indexată, fără față, eșuată), apoi rezumatul.
+    Fișierul e scris pe loc (flush per linie), ca să poată fi urmărit și dacă sync-ul se oprește."""
+    def __init__(self):
+        self.path = None
+        self.file = None
+        try:
+            os.makedirs(SYNC_REPORT_DIR, exist_ok=True)
+            # Păstrăm doar ultimele SYNC_REPORT_KEEP rapoarte
+            old = sorted(f for f in os.listdir(SYNC_REPORT_DIR) if f.startswith("sync-") and f.endswith(".log"))
+            for name in old[:max(0, len(old) - SYNC_REPORT_KEEP + 1)]:
+                os.remove(os.path.join(SYNC_REPORT_DIR, name))
+            self.path = os.path.join(SYNC_REPORT_DIR, time.strftime("sync-%Y%m%d-%H%M%S.log"))
+            self.file = open(self.path, "w", encoding="utf-8")
+            print(f"📝 SYNC REPORT: {self.path}")
+        except Exception as e:
+            print(f"⚠️ Nu pot scrie raportul sync-ului în {SYNC_REPORT_DIR} ({e}); continui fără el.")
+
+    def line(self, text):
+        if self.file:
+            self.file.write(text + "\n")
+            self.file.flush()
+
+    def item(self, status, person, url, detail=""):
+        self.line(f"{time.strftime('%H:%M:%S')}  {status:<15} persoana {str(person):<8} {url}" + (f"  ({detail})" if detail else ""))
+
+    def close(self, summary):
+        self.line("")
+        self.line(summary)
+        if self.file:
+            self.file.close()
+            self.file = None
 
 def run_sync_job():
     """Sincronizează indexul cu setul selectat din "WantedImages" (SYNC_MAX_PERSONS)."""
+    report = SyncReport()
+    try:
+        summary = sync_index(report)
+    except Exception as e:
+        summary = f"🏁 SYNC FAILED: {type(e).__name__}: {e}"
+    if report.path:
+        summary += f" Report: {report.path}"
+    print(summary)
+    report.close(summary)
+
+def sync_index(report):
+    """Corpul sync-ului; întoarce linia finală (SYNC FINISHED / SYNC FAILED)."""
     global vector_db, no_face_urls
     limit = SYNC_MAX_PERSONS or "fără limită"
     classes = "*" if SYNC_ALL_CLASSIFICATIONS else ",".join(SYNC_INCLUDE_CLASSIFICATIONS)
     print(f"⏰ SYNC STARTED (max persons: {limit}, classifications: {classes}, batch {SYNC_BATCH_SIZE}, delay {SYNC_DELAY_MS} ms)...")
+    report.line(f"SYNC {time.strftime('%Y-%m-%d %H:%M:%S')} (max persons: {limit}, classifications: {classes}, retry: {SYNC_RETRY_DELAYS or '-'})")
+    report.line("Status: INDEXAT = adăugată în index; FARA_FATA = descărcată, dar fără față detectabilă;")
+    report.line("        DESCARCARE_ESUATA = nu s-a putut descărca (motivul în paranteză); EROARE_AI = eroare la procesare.")
+    report.line("")
 
     # 1. Luăm pozele
     db_rows = fetch_images_from_postgres()
     if db_rows is None:
-        print("🏁 SYNC FAILED: nu pot citi \"WantedImages\" din DB.")
-        return
+        return "🏁 SYNC FAILED: nu pot citi \"WantedImages\" din DB."
     if not db_rows:
         # Tabela goală (scraper-ul n-a rulat încă): nu ștergem nimic din index
         counts = fetch_person_counts()
@@ -270,8 +324,7 @@ def run_sync_job():
             print("⚠️ No URLs found: nicio persoană nu corespunde SYNC_INCLUDE_CLASSIFICATIONS.")
         else:
             print("⚠️ No URLs found in \"WantedImages\" (scraper-ul FBI n-a terminat încă?).")
-        print(f"🏁 SYNC FINISHED. Added 0, removed 0, failed 0, no face 0. Index size: {len(vector_db)}")
-        return
+        return f"🏁 SYNC FINISHED. Added 0, removed 0, failed 0, no face 0. Index size: {len(vector_db)}"
 
     units = select_sync_units(db_rows)
     url_to_unit = unit_url_map(units)
@@ -304,8 +357,8 @@ def run_sync_job():
     unit_name = "persons" if SYNC_MAX_PERSONS else "images"
     if not total:
         print("✅ Nothing new to index.")
-        print(f"🏁 SYNC FINISHED. Added 0, removed {removed}, failed 0, no face {known_no_face}. Index size: {len(vector_db)}")
-        return
+        report.line("Nimic nou de indexat.")
+        return f"🏁 SYNC FINISHED. Added 0, removed {removed}, failed 0, no face {known_no_face}. Index size: {len(vector_db)}"
 
     print(f"🔄 Indexing {total} {unit_name} ({len(units)} selected, {len(covered)} already indexed)...")
 
@@ -317,10 +370,11 @@ def run_sync_job():
             only_no_face = True
             # Prima poză cu față detectabilă; altfel următoarea poză a aceleiași persoane
             for u_orig, u_large in candidates:
-                img_bytes, url = download_image(u_orig, u_large)
+                img_bytes, url, reason = download_image(u_orig, u_large)
                 if img_bytes is None:
                     only_no_face = False
-                    print(f"⚠️ Download failed: {url}")
+                    print(f"⚠️ Download failed: {url} ({reason})")
+                    report.item("DESCARCARE_ESUATA", key, url, reason)
                     continue
                 try:
                     img_mat = limit_image_size(cv2.imdecode(img_bytes, cv2.IMREAD_COLOR))
@@ -337,13 +391,16 @@ def run_sync_job():
                     except ValueError:
                         no_face_urls.add(url)
                         print(f"🙈 No face: {url}")
+                        report.item("FARA_FATA", key, url)
                         continue
                     vector_db.append({"url": url, "embedding": objs[0]["embedding"]})
                     indexed = True
+                    report.item("INDEXAT", key, url)
                     break
                 except Exception as e:
                     only_no_face = False
                     print(f"❌ AI Failed for {url}: {e}")
+                    report.item("EROARE_AI", key, url, str(e))
             if indexed:
                 added += 1
             elif only_no_face:
@@ -355,7 +412,7 @@ def run_sync_job():
         save_index()
         print(f"📊 Progress: {processed}/{total} {unit_name} processed, {added} added, {failed} failed, {no_face} no face. Index size: {len(vector_db)}")
 
-    print(f"🏁 SYNC FINISHED. Added {added}, removed {removed}, failed {failed}, no face {no_face + known_no_face}. Index size: {len(vector_db)}")
+    return f"🏁 SYNC FINISHED. Added {added}, removed {removed}, failed {failed}, no face {no_face + known_no_face}. Index size: {len(vector_db)}"
 # --- 2. CONFIGURARE SCHEDULER ---
 scheduler = BackgroundScheduler()
 

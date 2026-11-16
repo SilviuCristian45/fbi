@@ -281,7 +281,12 @@ still cannot be downloaded count as failed and are retried on the next run. Imag
 face are remembered in `fbi_vectors.pkl.noface.json` and skipped later; a
 person none of whose images has a face is reported as "no face", not as
 missing. The log shows `Progress: X/Y persons processed, A added, F failed,
-N no face` and a final `SYNC FINISHED` line. `GET /index-status` (internal)
+N no face` and a final `SYNC FINISHED` line. Every run also writes a per-image
+report (`INDEXAT`, `FARA_FATA`, `DESCARCARE_ESUATA` with the reason, e.g.
+`HTTP 403` or `content-type text/html`, `EROARE_AI`) to `sync-reports/` next to
+the index (`SYNC_REPORT_DIR`, last `SYNC_REPORT_KEEP` = 20 kept);
+`scripts/sync-faces.sh` copies it to `logs/sync-faces/<env>-sync-*.log`, which
+is committed to git (the rest of `logs/` is ignored). `GET /index-status` (internal)
 compares the index with the expected set using the same rule; the scripts use
 it. It runs only at startup when `RUN_SYNC_AT_STARTUP=true`;
 `scripts/sync-faces.sh` triggers it on demand and is a required step after the

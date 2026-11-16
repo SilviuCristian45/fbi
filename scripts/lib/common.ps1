@@ -33,7 +33,7 @@ function Assert-EnvFile {
     }
 }
 
-# Wrapper peste 'docker compose' cu fisierele de dev. Functie simpla (fara
+# Wrapper peste 'docker compose' cu fisierele de dev (base + build + dev). Functie simpla (fara
 # param) ca argumentele de tip '-d' sa treaca neschimbate in $args.
 # Accepta si array-uri ca argumente (Invoke-Compose $upArgs): le aplatizeaza,
 # altfel PowerShell ar trimite tot array-ul ca UN singur argument lui docker.
@@ -42,6 +42,7 @@ function Invoke-Compose {
         'compose',
         '--project-directory', $script:RootDir,
         '-f', (Join-Path $script:RootDir 'docker-compose.yaml'),
+        '-f', (Join-Path $script:RootDir 'docker-compose.build.yml'),
         '-f', (Join-Path $script:RootDir 'docker-compose.dev.yml'),
         '--env-file', $script:EnvFile
     )

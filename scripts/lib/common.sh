@@ -50,20 +50,25 @@ require_docker() {
 }
 
 # --- Mediu (dev / prod) -------------------------------------------------------
-# use_env dev|prod  -> seteaza STACK_ENV, ENV_FILE, OVERLAY_FILE si verifica
+# use_env dev|prod  -> seteaza STACK_ENV, ENV_FILE, OVERLAY_FILES si verifica
 # ca fisierul env exista (altfel opreste scriptul cu instructiuni).
+#   dev : base + build + dev (imaginile se construiesc local)
+#   prod: base + prod (fara build; IMAGE_TAG vine din RELEASE_FILE)
+# Pentru teste locale se pot suprascrie PROD_ENV_FILE si RELEASE_FILE.
 use_env() {
   STACK_ENV="$1"
   case "$STACK_ENV" in
     dev)
       ENV_FILE="$ROOT_DIR/.env"
       ENV_EXAMPLE=".env.example"
-      OVERLAY_FILE="docker-compose.dev.yml"
+      OVERLAY_FILES=(docker-compose.build.yml docker-compose.dev.yml)
+      RELEASE_FILE=""
       ;;
     prod)
-      ENV_FILE="$ROOT_DIR/.env.prod"
+      ENV_FILE="${PROD_ENV_FILE:-$ROOT_DIR/.env.prod}"
       ENV_EXAMPLE=".env.prod.example"
-      OVERLAY_FILE="docker-compose.prod.yml"
+      OVERLAY_FILES=(docker-compose.prod.yml)
+      RELEASE_FILE="${RELEASE_FILE:-$ROOT_DIR/.env.release}"
       ;;
     *) die "Mediu necunoscut: $STACK_ENV (dev|prod)" ;;
   esac
@@ -74,13 +79,17 @@ use_env() {
 }
 
 # Wrapper peste `docker compose` cu fisierele mediului curent.
+# In prod adauga RELEASE_FILE (IMAGE_TAG) ca al doilea --env-file, daca exista.
 compose() {
-  docker compose \
-    --project-directory "$ROOT_DIR_HOST" \
-    -f "$ROOT_DIR_HOST/docker-compose.yaml" \
-    -f "$ROOT_DIR_HOST/$OVERLAY_FILE" \
-    --env-file "$(host_path "$ENV_FILE")" \
-    "$@"
+  local args=(--project-directory "$ROOT_DIR_HOST" -f "$ROOT_DIR_HOST/docker-compose.yaml") f
+  for f in "${OVERLAY_FILES[@]}"; do
+    args+=(-f "$ROOT_DIR_HOST/$f")
+  done
+  args+=(--env-file "$(host_path "$ENV_FILE")")
+  if [[ -n "${RELEASE_FILE:-}" && -f "$RELEASE_FILE" ]]; then
+    args+=(--env-file "$(host_path "$RELEASE_FILE")")
+  fi
+  docker compose "${args[@]}" "$@"
 }
 
 # Numele proiectului compose (prefixul volumelor/containerelor)
@@ -88,12 +97,13 @@ project_name() {
   compose config 2>/dev/null | sed -n 's/^name: *//p' | head -n1
 }
 
-# env_get CHEIE -> valoarea din ENV_FILE, fara a executa fisierul
-# (valorile pot contine caractere speciale). Ultima aparitie castiga,
+# env_get CHEIE [FISIER] -> valoarea din ENV_FILE (sau FISIER), fara a executa
+# fisierul (valorile pot contine caractere speciale). Ultima aparitie castiga,
 # ca la docker compose. Elimina CR (fisiere editate pe Windows) si ghilimele.
 env_get() {
-  local key="$1" line val
-  line="$(grep -E "^[[:space:]]*${key}=" "$ENV_FILE" | tail -n1 || true)"
+  local key="$1" file="${2:-$ENV_FILE}" line val
+  [[ -f "$file" ]] || return 0
+  line="$(grep -E "^[[:space:]]*${key}=" "$file" | tail -n1 || true)"
   [[ -z "$line" ]] && return 0
   val="${line#*=}"
   val="${val%$'\r'}"
@@ -106,7 +116,7 @@ env_get() {
   printf '%s' "$val"
 }
 
-# Validari pentru .env.prod (folosite de prod-deploy, init-ssl, prod-update)
+# Validari pentru .env.prod (folosite de prod-deploy, init-ssl, release-build)
 validate_prod_env() {
   local domain placeholders minio_pass
   domain="$(env_get DOMAIN)"
@@ -126,6 +136,122 @@ validate_prod_env() {
     perms="$(stat -c '%a' "$ENV_FILE")"
     [[ "$perms" =~ [0-7][0-7]0$ ]] || warn ".env.prod e lizibil de alti useri (permisiuni $perms). Recomandat: chmod 600 .env.prod"
   fi
+}
+
+# --- Imagini proprii / release -------------------------------------------------
+# Serviciile cu imagine construita de noi (pe PC); restul se descarca din registry.
+# shellcheck disable=SC2034  # folosite de scripturile care includ acest fisier
+OWN_SERVICES=(backend frontend python-ai file-api nginx)
+# shellcheck disable=SC2034
+THIRD_PARTY_SERVICES=(db keycloak rabbitmq minio certbot)
+
+image_prefix() {
+  local p
+  p="$(env_get IMAGE_PREFIX)"
+  printf '%s' "${p:-fbi}"
+}
+
+# own_image SERVICIU TAG -> ${IMAGE_PREFIX}/SERVICIU:TAG
+own_image() {
+  printf '%s/%s:%s' "$(image_prefix)" "$1" "$2"
+}
+
+# release_tag_from_git ALLOW_DIRTY -> tag-ul imaginilor pentru commit-ul curent:
+# <sha-scurt>, sau <sha-scurt>-dirty daca exista modificari (inclusiv fisiere
+# netracked, care pot ajunge in contextul de build) si ALLOW_DIRTY=1.
+# Se apeleaza ca TAG="$(release_tag_from_git 0)"; esueaza pe working tree murdar.
+# (set -e nu se aplica in $(...), deci erorile se verifica explicit; fara
+# `git -C`: cu MSYS_NO_PATHCONV, git pentru Windows nu intelege /e/... )
+release_tag_from_git() {
+  local sha changes
+  sha="$(cd "$ROOT_DIR" && git rev-parse --short=7 HEAD)" && [[ -n "$sha" ]] \
+    || { err "Nu pot citi commit-ul curent (git rev-parse)."; return 1; }
+  changes="$(cd "$ROOT_DIR" && git status --porcelain)" \
+    || { err "git status a esuat."; return 1; }
+  if [[ -z "$changes" ]]; then
+    printf '%s' "$sha"
+  elif [[ "${1:-0}" == 1 ]]; then
+    warn "Working tree murdar (--allow-dirty): tag $sha-dirty, NU corespunde unui commit."
+    printf '%s-dirty' "$sha"
+  else
+    err "Working tree-ul nu e curat; tag-ul $sha nu ar corespunde codului din imagini:"
+    printf '%s\n' "$changes" | sed 's/^/    /' >&2
+    err "Fa commit (sau stash), ori foloseste --allow-dirty doar pentru teste."
+    return 1
+  fi
+}
+
+# Dimensiune in octeti -> text (ex. 412.3 MB)
+human_size() {
+  awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u); i = 1; while (b >= 1000 && i < 5) { b /= 1000; i++ }; printf (i == 1 ? "%d %s" : "%.1f %s"), b, u[i] }'
+}
+
+# Tag-ul curent / anterior din RELEASE_FILE (gol daca nu exista)
+release_tag()          { env_get IMAGE_TAG "$RELEASE_FILE"; }
+release_previous_tag() { env_get IMAGE_TAG_PREVIOUS "$RELEASE_FILE"; }
+
+# write_release TAG PREVIOUS -> rescrie RELEASE_FILE atomic
+write_release() {
+  local tmp="$RELEASE_FILE.tmp"
+  {
+    echo "# Generat de scripts/release-push.sh / rollback.sh. Nu edita manual."
+    echo "IMAGE_TAG=$1"
+    echo "IMAGE_TAG_PREVIOUS=$2"
+  } > "$tmp"
+  mv "$tmp" "$RELEASE_FILE"
+}
+
+# Platforma docker pentru iesirea lui `uname -m`
+platform_for_arch() {
+  case "$1" in
+    x86_64|amd64) echo linux/amd64 ;;
+    aarch64|arm64) echo linux/arm64 ;;
+    armv7l) echo linux/arm/v7 ;;
+    *) echo "unknown/$1" ;;
+  esac
+}
+
+# Amprenta continutului unei imagini: layerele necomprimate (diffID) + config-ul
+# relevant (Env, Cmd, Entrypoint, Labels - labelul revision contine commit-ul).
+# Nu depinde de image store (containerd pe Docker Desktop, overlay2 clasic pe
+# VPS), spre deosebire de .Id. Acelasi format se calculeaza si pe VPS (prin ssh).
+# shellcheck disable=SC2016
+FINGERPRINT_FORMAT='{{json .RootFS.Layers}}{{json .Config.Env}}{{json .Config.Cmd}}{{json .Config.Entrypoint}}{{json .Config.Labels}}'
+# Scriptul (bash -s) care afiseaza "imagine amprenta" (sau "imagine -" daca lipseste)
+# pentru fiecare argument; $1 = formatul. Ruleaza local sau pe VPS.
+# shellcheck disable=SC2016
+FINGERPRINT_SCRIPT='fmt="$1"; shift
+for i in "$@"; do
+  if f="$(docker image inspect -f "$fmt" "$i" 2>/dev/null)"; then
+    printf "%s %s\n" "$i" "$(printf "%s" "$f" | tr -d "\r" | sha256sum | cut -c1-16)"
+  else
+    printf "%s -\n" "$i"
+  fi
+done'
+image_fingerprints() {
+  bash -c "$FINGERPRINT_SCRIPT" _ "$FINGERPRINT_FORMAT" "$@"
+}
+
+# --- SSH spre VPS (release-push, push-face-index) -------------------------------
+# SSH_TARGET (user@host) si SSH_OPTS se seteaza de scripturi.
+# ssh_run CMD ARGS... -> ruleaza comanda pe VPS cu argumentele citate corect.
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15)
+ssh_run() {
+  # shellcheck disable=SC2029  # argumentele sunt citate intentionat local (%q)
+  ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "$(printf '%q ' "$@")"
+}
+# ssh_script SCRIPT ARGS... -> trimite SCRIPT pe stdin la `bash -s` pe VPS
+ssh_script() {
+  local script="$1"; shift
+  # shellcheck disable=SC2029
+  ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "bash -s -- $(printf '%q ' "$@")" <<<"$script"
+}
+# ssh_in_dir DIR CMD... -> ruleaza o linie de comanda in directorul proiectului
+# (CMD e o singura linie shell; folosita pentru scripturile din repo).
+ssh_in_dir() {
+  local dir="$1"; shift
+  # shellcheck disable=SC2029
+  ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "cd $(printf '%q' "$dir") && $*"
 }
 
 # --- Starea containerelor -----------------------------------------------------

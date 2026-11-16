@@ -39,8 +39,16 @@ if (-not $Yes) {
     if ($answer -ne 'reset') { Exit-WithError "Anulat." }
 }
 
-$downArgs = @('down', '-v', '--remove-orphans')
-if ($Images) { $downArgs += @('--rmi', 'local') }
-Invoke-Compose @downArgs
+Invoke-Compose down -v --remove-orphans
 if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose down a esuat." }
+if ($Images) {
+    # Imaginile proprii au nume explicit (<IMAGE_PREFIX>/<serviciu>:dev), deci
+    # 'down --rmi local' nu le-ar sterge; le stergem doar pe ale noastre.
+    $prefix = (Get-Content $script:EnvFile | Where-Object { $_ -match '^\s*IMAGE_PREFIX=' } | Select-Object -Last 1) -replace '^\s*IMAGE_PREFIX=', ''
+    if (-not $prefix) { $prefix = 'fbi' }
+    foreach ($s in 'backend', 'frontend', 'python-ai', 'file-api', 'nginx') {
+        docker image rm "${prefix}/${s}:dev" 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { Write-Ok "sters ${prefix}/${s}:dev" }
+    }
+}
 Write-Ok "Reset complet. Porneste din nou cu: scripts\dev-up.ps1"

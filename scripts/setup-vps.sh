@@ -19,7 +19,8 @@ usage() {
 Utilizare: sudo scripts/setup-vps.sh [optiuni]
 
 Pregateste un VPS proaspat (Ubuntu 22.04/24.04 sau Debian 12):
-  1. pachete de baza (git, curl, ufw, openssl...)
+  1. pachete de baza (git, curl, ufw, openssl...). Fara dotnet/node/python:
+     pe VPS nu se construieste nimic, imaginile vin de pe PC (release-push.sh)
   2. Docker Engine + pluginul compose din repository-ul oficial Docker
   3. user non-root (implicit "deploy") in grupul docker, cu cheile SSH
      copiate de la root (daca exista)
@@ -125,7 +126,7 @@ fi
 mem_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
 mem_gb=$(( (mem_kb + 1048575) / 1048576 ))
 info "RAM detectat: ~${mem_gb} GB (minim recomandat 4 GB, ideal 8 GB)."
-(( mem_gb < 4 )) && warn "Sub 4 GB RAM: serviciul AI (TensorFlow) si build-urile pot esua chiar si cu swap."
+(( mem_gb < 4 )) && warn "Sub 4 GB RAM: serviciul AI (TensorFlow) si Keycloak pot fi omorate (OOM) chiar si cu swap."
 if (( DO_SWAP )); then
   if [[ -n "$(swapon --show --noheadings 2>/dev/null)" ]]; then
     ok "Swap deja activ: $(swapon --show --noheadings | awk '{print $1" "$3}' | tr '\n' ' ')"
@@ -151,5 +152,8 @@ ${C_GREEN}VPS pregatit.${C_RESET} Pasii urmatori (ca $DEPLOY_USER):
   git clone <url-repo> fbi && cd fbi
   cp .env.prod.example .env.prod && chmod 600 .env.prod && nano .env.prod
   scripts/init-ssl.sh
-  scripts/prod-deploy.sh
+
+Apoi de pe PC (acelasi .env.prod si local):
+  scripts/release-build.sh
+  scripts/release-push.sh $DEPLOY_USER@<ip-server> --with-index
 NEXT

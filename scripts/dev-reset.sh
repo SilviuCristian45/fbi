@@ -41,7 +41,13 @@ info "Proiect: $project"
 info "Volume care vor fi sterse: ${volumes:-(niciunul)}"
 confirm "Toate datele de dev ale proiectului '$project' vor fi sterse definitiv." "reset"
 
-args=(down -v --remove-orphans)
-(( RMI )) && args+=(--rmi local)
-compose "${args[@]}"
+compose down -v --remove-orphans
+if (( RMI )); then
+  # Imaginile proprii au nume explicit (${IMAGE_PREFIX}/<serviciu>:dev), deci
+  # `down --rmi local` nu le-ar sterge; le stergem doar pe ale noastre.
+  dev_tag="$(env_get IMAGE_TAG)"
+  for s in "${OWN_SERVICES[@]}"; do
+    docker image rm "$(own_image "$s" "${dev_tag:-dev}")" >/dev/null 2>&1 && ok "sters $(own_image "$s" "${dev_tag:-dev}")"
+  done
+fi
 ok "Reset complet. Porneste din nou cu: scripts/dev-up.sh"

@@ -8,7 +8,7 @@ usage() {
   cat <<'USAGE'
 Utilizare: scripts/init-ssl.sh [optiuni]
 
-Prima data (inainte de scripts/prod-deploy.sh):
+Prima data (pe VPS, inainte de primul scripts/release-push.sh de pe PC):
   - porneste un nginx TEMPORAR pe portul 80 care serveste doar
     /.well-known/acme-challenge/ (nginx-ul de prod nu poate porni fara
     certificat, deci nu-l putem folosi);
@@ -135,4 +135,4 @@ TEMP_NGINX=0
 reload_nginx
 ok "Certificat emis pentru $DOMAIN$( (( WITH_WWW )) && echo " si www.$DOMAIN")."
 (( STAGING )) && warn "Certificat de STAGING (nu e de incredere in browser). Pentru cel real: scripts/init-ssl.sh --force"
-info "Urmatorul pas: scripts/prod-deploy.sh"
+info "Urmatorul pas, de pe PC: scripts/release-build.sh && scripts/release-push.sh <user@vps> (primul deploy: --with-index)"

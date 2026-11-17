@@ -14,7 +14,7 @@ const MapInner = dynamic(() => import("./MapInner"), {
     loading: () => <Skeleton className="h-full w-full rounded-none" />
 });
 
-const ADDRESS_PREFIX = "📍 Estimated address:";
+const ADDRESS_PREFIX = "Estimated address:";
 
 interface MapModalProps {
   isOpen: boolean;

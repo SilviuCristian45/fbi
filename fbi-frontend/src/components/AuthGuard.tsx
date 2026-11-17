@@ -2,7 +2,7 @@
 
 import * as signalR from "@microsoft/signalr";
 import { toast } from "react-hot-toast";
-import { AppToaster } from "./ui/Toast";
+import { AppToaster, AlertToast } from "./ui/Toast";
 import { usePathname, useRouter } from "next/navigation";
 import { SignalRProvider, useSignalR } from "../context/SignalRContext";
 import { useEffect, useState, useRef } from "react";
@@ -51,13 +51,13 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
                     conn.off("ReceiveUrgentAlert");
                     conn.on("ReceiveUrgentAlert", (msg) => {
                         playAlertTone();
-                        toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
+                        toast.custom((t) => <AlertToast t={t} title="Critical alert">{msg}</AlertToast>, { duration: 10000 });
                     });
 
 					conn.off("ReceiveActivity");
 					conn.on("ReceiveActivity", (msg) => {
 						console.log("Activitate primită:", msg);
-						toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
+						toast.custom((t) => <AlertToast t={t} title="Sighting near your location">{msg}</AlertToast>, { duration: 10000 });
 					});
 
                     setConnection(conn);

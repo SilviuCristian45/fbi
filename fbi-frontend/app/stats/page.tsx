@@ -68,7 +68,7 @@ function StatsPageContent() {
         setStats(result.data);
       } catch (err) {
         console.error("Eroare la încărcarea statisticilor:", err);
-        setError((err instanceof Error && err.message) || "Eroare necunoscută la conectarea cu serverul.");
+        setError((err instanceof Error && err.message) || "Unknown error while contacting the server.");
       } finally {
         setLoading(false);
       }

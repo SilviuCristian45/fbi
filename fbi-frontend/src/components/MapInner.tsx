@@ -1,20 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import L from "leaflet";
+import { pinIcon } from "../lib/map-icons";
 import "leaflet/dist/leaflet.css";
 
-// Definim Iconița aici, sigur funcționează
-const customIcon = new L.Icon({
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-});
+// Pin drawn in CSS, served with the app (no marker images from a CDN).
+const customIcon = pinIcon("primary");
 
 interface MapInnerProps {
     position: [number, number] | null;
@@ -24,9 +15,8 @@ interface MapInnerProps {
 // Componenta care ascultă click-urile
 // O separăm ca să fim siguri că primește contextul hărții
 function ClickHandler({ setPosition }: { setPosition: (pos: [number, number]) => void }) {
-    const map = useMapEvents({
+    useMapEvents({
         click(e) {
-            console.log("📍 Click detectat la:", e.latlng); // Debug în consolă
             setPosition([parseFloat(e.latlng.lat.toFixed(6)) ?? 45, parseFloat(e.latlng.lng.toFixed(6)) ?? 45]);
         },
     });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "react-hot-toast";
 import MapModal from "@/src/components/MapModal";
 import { reportLocation, uploadFile } from "@/src/lib/api-client";
 
@@ -26,11 +27,11 @@ export function useReportSighting() {
     try {
       const fileUrl = file ? await uploadFile(file) : "no image";
       await reportLocation(target.id, lat, lng, details, fileUrl);
-      alert("Locația a fost trimisă cu succes! 🕵️‍♂️");
+      toast.success("Sighting reported. Thank you — the photo is being analysed.");
       setIsOpen(false);
       setTarget(null);
     } catch (error) {
-      alert("Eroare la trimiterea locației.");
+      toast.error("The sighting could not be sent. Please try again.");
       console.error(error);
     }
   };

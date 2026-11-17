@@ -10,8 +10,8 @@ export interface TabItem {
 }
 
 // Shared ids so a tab and its panel reference each other (aria-controls / aria-labelledby).
-const tabId = (prefix: string, id: string) => `${prefix}-tab-${id}`;
-const panelId = (prefix: string, id: string) => `${prefix}-panel-${id}`;
+export const tabId = (prefix: string, id: string) => `${prefix}-tab-${id}`;
+export const panelId = (prefix: string, id: string) => `${prefix}-panel-${id}`;
 
 interface TabsProps {
   /** Same value must be passed to the matching TabPanel components (e.g. from useId()). */

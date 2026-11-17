@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { CheckCircle2, ExternalLink, Loader2, Map as MapIcon } from "lucide-react";
 import { ReportItem, ReportStatus } from "../types/reports";
 import RouteModal from "./RouteModal";
 import { authFetch } from "../lib/api-client";
 import { Sighting } from "./SightingsList";
+import { Modal } from "./ui/Modal";
+import { Button } from "./ui/Button";
+import { Tabs, tabId, panelId } from "./ui/Tabs";
+import { PersonPhoto } from "./wanted/PersonPhoto";
+import { ReportStatusBadge, ConfidenceBar } from "./reports/ReportStatus";
+import { cn } from "../lib/cn";
 
 interface Props {
   report: ReportItem | null;
@@ -13,6 +20,8 @@ export function ReportDetailsModal({ report, onClose }: Props) {
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
   const [sightings, setSightings] = useState<Sighting[]>([]);
   const [, setLoading] = useState(true);
+  const [tab, setTab] = useState("evidence");
+  const tabsId = useId();
   const wantedId = report?.wantedId;
 
   useEffect(() => {
@@ -33,173 +42,152 @@ export function ReportDetailsModal({ report, onClose }: Props) {
 
   if (!report) return null;
 
-  // Funcție ca să închidem modalul când dăm click pe fundalul negru
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  // On small screens the two halves become tabs; on md+ both are visible side by side.
+  const panelProps = (id: string) => ({
+    role: "tabpanel" as const,
+    id: panelId(tabsId, id),
+    "aria-labelledby": tabId(tabsId, id),
+  });
 
   return (
-    // 1. BACKDROP (Fundal întunecat)
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={handleBackdropClick}
-    >
-          <RouteModal 
-             isOpen={isRouteModalOpen}
-             onClose={() => setIsRouteModalOpen(false)}
-             locations={sightings}
-             title={`Target #${report.wantedId}`}
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        size="xl"
+        fill
+        title={<>Analysis report <span className="font-mono text-base text-muted">#{report.id}</span></>}
+        description={report.name}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsRouteModalOpen(true)} disabled={sightings.length === 0}>
+              <MapIcon className="size-4" aria-hidden="true" /> View route
+            </Button>
+            <Button onClick={onClose}>Close</Button>
+          </>
+        }
+      >
+        <div className="border-b border-border px-5 md:hidden">
+          <Tabs
+            idPrefix={tabsId}
+            label="Report sections"
+            value={tab}
+            onChange={setTab}
+            tabs={[{ id: "evidence", label: "Evidence" }, { id: "results", label: "AI results", count: report.matches?.length || 0 }]}
+            className="border-b-0"
           />
-
-      {/* 2. MODAL CONTENT */}
-      <div className="bg-white dark:bg-gray-800 w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 transition-colors">
-        
-        {/* HEADER */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 transition-colors">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Analysis Report #{report.id}</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{report.name}</p>
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Last Known Location</p>
-             <p className="text-sm text-gray-800 dark:text-gray-200"> Lat: {report.latitude?.toFixed(4)} </p>
-             <p className="text-sm text-gray-800 dark:text-gray-200"> Lng: {report.longitude?.toFixed(4)} </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button 
-                    onClick={() => setIsRouteModalOpen(true)}
-                    disabled={sightings.length === 0}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    View Route 🗺️
-                </button>
-                      
-            <button 
-                onClick={onClose}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400"
-            >
-                ✕
-            </button>
-          </div>
         </div>
 
         {/* BODY (Split View) */}
-        <div className="flex flex-col md:flex-row h-full overflow-hidden">
-          
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+
           {/* STÂNGA: EVIDENCE (Poza Agentului) */}
-          <div className="w-full md:w-5/12 bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center justify-center border-r border-gray-200 dark:border-gray-700 overflow-y-auto transition-colors">
-            <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4 self-start">📸 Original Evidence</h3>
-            <div className="relative w-full aspect-[3/4] rounded-xl overflow-hidden shadow-lg border-4 border-white dark:border-gray-700">
-              <img 
-                src={report.url} 
-                className="w-full h-full object-cover"
-                alt="Original Suspect" 
-                onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/400x600?text=No+Image'; }}
-              />
+          <section
+            {...panelProps("evidence")}
+            className={cn("overflow-y-auto border-border bg-subtle p-5 md:w-5/12 md:border-r", tab !== "evidence" && "max-md:hidden")}
+          >
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted max-md:sr-only">Submitted photo</h3>
+            <div className="mt-3 overflow-hidden rounded-lg border border-border bg-surface">
+              <PersonPhoto src={report.url} alt={`Photo submitted with report ${report.id}`} position="center" fit="contain" className="aspect-[3/4] w-full" />
             </div>
-            <div className="mt-6 w-full bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                <p className="text-xs text-gray-400 uppercase font-bold">Details</p>
-                <p className="text-gray-800 dark:text-gray-200 mt-1 text-sm">{report.description}</p>
-            </div>
-          </div>
+            <dl className="mt-5 grid gap-4 text-sm">
+              <div>
+                <dt className="font-semibold text-muted">Status</dt>
+                <dd className="mt-1"><ReportStatusBadge report={report} /></dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-muted">Location</dt>
+                <dd className="mt-1 font-mono">{report.latitude?.toFixed(4)}, {report.longitude?.toFixed(4)}</dd>
+              </div>
+              {report.description && (
+                <div>
+                  <dt className="font-semibold text-muted">Details</dt>
+                  <dd className="mt-1 whitespace-pre-line break-words text-fg">{report.description}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
 
           {/* DREAPTA: AI RESULTS (Lista Scrollabilă) */}
-          <div className="w-full md:w-7/12 bg-white dark:bg-gray-800 flex flex-col transition-colors">
-              <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10 flex justify-between items-center">
-                <h3 className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
-                    🤖 AI Identification Results
-                </h3>
-                {report.status === ReportStatus.Pending && (
-                    <span className="text-xs text-blue-500 dark:text-blue-400 animate-pulse font-bold">SCANNING IN PROGRESS...</span>
-                )}
+          <section
+            {...panelProps("results")}
+            className={cn("flex min-h-0 flex-1 flex-col md:w-7/12", tab !== "results" && "max-md:hidden")}
+          >
+              <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 max-md:hidden">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Face analysis results</h3>
+                <span className="text-sm text-muted">{report.matches?.length || 0} candidates</span>
               </div>
 
-              <div className="overflow-y-auto p-4 space-y-4 flex-1">
-                
+              <div className="flex-1 space-y-3 overflow-y-auto p-5">
+
                 {/* SCENARIUL 1: PENDING */}
                 {report.status === ReportStatus.Pending && (
-                    <div className="flex flex-col items-center justify-center h-full text-center p-10 opacity-70">
-                        <div className="relative w-24 h-24 mb-4">
-                             <div className="absolute inset-0 border-4 border-blue-100 dark:border-blue-900 rounded-full"></div>
-                             <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
-                             <div className="absolute inset-0 flex items-center justify-center text-4xl">🕵️‍♂️</div>
-                        </div>
-                        <h4 className="text-lg font-bold text-gray-700 dark:text-gray-300">Analyzing Biometrics</h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                            Comparing face vectors against FBI database...<br/>
-                            This usually takes 2-5 seconds.
+                    <div className="flex h-full flex-col items-center justify-center gap-3 py-10 text-center" role="status">
+                        <Loader2 className="size-10 text-primary motion-safe:animate-spin" aria-hidden="true" />
+                        <h4 className="text-lg font-bold">Analysing the photo</h4>
+                        <p className="max-w-sm text-muted">
+                            The face is being compared with the wanted list. This usually takes a few seconds; the list updates on its own.
                         </p>
                     </div>
                 )}
 
                 {/* SCENARIUL 2: COMPLETED dar 0 matches */}
                 {report.status === ReportStatus.Completed && (!report.matches || report.matches.length === 0) && (
-                    <div className="text-center py-20 text-gray-400 dark:text-gray-500">
-                        <div className="text-4xl mb-2">✅</div>
-                        <p>No matches found in the FBI database.</p>
-                        <p className="text-xs mt-2">Subject appears to be a civilian.</p>
+                    <div className="flex flex-col items-center gap-3 py-14 text-center">
+                        <CheckCircle2 className="size-10 text-ok" aria-hidden="true" />
+                        <h4 className="text-lg font-bold">No match in the wanted list</h4>
+                        <p className="text-muted">No indexed face was similar enough to this photo.</p>
                     </div>
                 )}
 
                 {/* SCENARIUL 3: ARE MATCH-URI */}
                 {report.matches && report.matches.length > 0 && (
-                     report.matches.map((match, idx) => (
-                        <div 
-                            key={idx} 
-                            className={`flex gap-4 p-4 rounded-xl border-2 transition-all ${
-                                match.confidence > 80 
-                                ? "border-red-100 bg-red-50/30 dark:border-red-900/30 dark:bg-red-900/10" 
-                                : "border-gray-100 hover:border-blue-200 dark:border-gray-700 dark:hover:border-blue-700 dark:bg-gray-700/50"
-                            }`}
+                    <ol className="space-y-3">
+                     {report.matches.map((match, idx) => (
+                        <li
+                            key={idx}
+                            className={cn(
+                                "flex gap-4 rounded-lg border p-3",
+                                match.confidence > 80 ? "border-alert bg-alert-soft" : "border-border",
+                            )}
                         >
                             {/* Poza FBI */}
-                            <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-600 border border-gray-200 dark:border-gray-600">
-                                <img 
-                                    src={match.url} 
-                                    className="w-full h-full object-cover"
-                                    alt="FBI Record" 
-                                />
-                            </div>
+                            <PersonPhoto src={match.url} alt={`Candidate ${idx + 1}`} className="size-20 shrink-0 rounded-md" />
 
                             {/* Info Match */}
-                            <div className="flex-grow">
-                                <div className="flex justify-between items-start">
-                                    <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Candidate #{idx + 1}</span>
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                        match.confidence > 80 
-                                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" 
-                                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                                    }`}>
-                                            {match.confidence.toFixed(2)}% Match
-                                    </span>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-semibold">Candidate {idx + 1}</span>
+                                    <ConfidenceBar value={match.confidence} />
                                 </div>
-                                
-                                <div className="mt-2">
-                                    <p className="text-sm text-gray-600 dark:text-gray-300">Source Database Record:</p>
-                                    <a href={match.url} target="_blank" className="text-blue-600 dark:text-blue-400 hover:underline text-xs break-all line-clamp-1">
-                                            {match.url}
-                                    </a>
-                                </div>
-
-                                {/* Bara de progres vizuală */}
-                                <div className="mt-3 w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
-                                    <div 
-                                            className={`h-full ${match.confidence > 80 ? "bg-red-500" : "bg-blue-500"}`} 
-                                            style={{ width: `${match.confidence}%` }}
-                                    />
-                                </div>
+                                <a
+                                  href={match.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                                >
+                                  Open the source photo <ExternalLink className="size-3.5" aria-hidden="true" />
+                                  <span className="sr-only">(opens in a new tab)</span>
+                                </a>
+                                <p className="mt-1 truncate text-xs text-muted" title={match.url}>{match.url}</p>
                             </div>
-                        </div>
-                    ))
+                        </li>
+                    ))}
+                    </ol>
                 )}
              </div>
-          </div>
+          </section>
 
         </div>
-      </div>
-    </div>
+      </Modal>
+
+      {/* Rendered after the report modal so it stacks on top of it. */}
+      <RouteModal
+         isOpen={isRouteModalOpen}
+         onClose={() => setIsRouteModalOpen(false)}
+         locations={sightings}
+         title={`Person #${report.wantedId}`}
+      />
+    </>
   );
 }

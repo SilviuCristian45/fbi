@@ -1,7 +1,8 @@
 "use client";
 
 import * as signalR from "@microsoft/signalr";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
+import { AppToaster } from "./ui/Toast";
 import { usePathname, useRouter } from "next/navigation";
 import { SignalRProvider, useSignalR } from "../context/SignalRContext";
 import { useEffect, useState, useRef } from "react";
@@ -134,8 +135,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // Asta previne eroarea "Client-side exception"
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-100">
-                <div className="text-xl font-semibold text-gray-600">Se verifică autentificarea...</div>
+            <div className="flex h-screen items-center justify-center" role="status">
+                <div className="flex items-center gap-3 text-muted">
+                    <span className="size-5 rounded-full border-2 border-border border-t-primary motion-safe:animate-spin" aria-hidden="true" />
+                    Checking your session…
+                </div>
             </div>
         );
     }
@@ -150,7 +154,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     return (
         <SignalRProvider>
             <SignalRManager token={token}>
-                <Toaster />
+                <AppToaster />
                 {children}
             </SignalRManager>
         </SignalRProvider>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Navbar } from "@/src/components/Navbar";
 import { authFetch, getUserLocation } from "@/src/lib/api-client"; // Presupunem că vom avea endpoint-ul
 
 // Import dinamic pentru hartă (fix SSR)
@@ -90,7 +89,6 @@ export default function MyLocationPage() {
     return (
         <main className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 p-4 md:p-8">
             <div className="max-w-7xl mx-auto">
-                <Navbar />
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-colors">
                     

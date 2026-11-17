@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { authFetch, saveFavourite } from "@/src/lib/api-client";
 import { PagedResult, WantedPersonSummary } from "@/src/types/wanted-person";
 import Link from "next/link";
-import { Navbar } from "@/src/components/Navbar";
 import { useRouter } from 'next/navigation'
 import { useReportSighting } from "@/src/lib/use-report-sighting";
 
@@ -124,7 +123,6 @@ export default function Home() {
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           
-          <Navbar />
 
           {/* SEARCH BAR */}
           <div className="mb-8 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">

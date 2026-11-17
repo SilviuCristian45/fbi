@@ -2,7 +2,6 @@
 
 import AdminGuard from "@/src/components/AdminGuard";
 import { useEffect, useState } from "react";
-import { Navbar } from "@/src/components/Navbar";
 import { authFetch } from "@/src/lib/api-client";
 import {
   AreaChart,
@@ -115,7 +114,6 @@ function StatsPageContent() {
   return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 pb-20">
         <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6">
-          <Navbar />
 
           <div className="mb-8 mt-6">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">📊 Intelligence Dashboard</h1>

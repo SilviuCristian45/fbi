@@ -32,3 +32,18 @@ function subscribe(onChange: () => void) {
 export function useRole() {
   return useSyncExternalStore(subscribe, readRole, () => null);
 }
+
+function readUsername(): string | null {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+  try {
+    return jwtDecode<{ preferred_username?: string }>(token).preferred_username ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Display name from the token (Keycloak preferred_username).
+export function useUsername() {
+  return useSyncExternalStore(subscribe, readUsername, () => null);
+}

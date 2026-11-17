@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { authFetch, saveFavourite } from "@/src/lib/api-client";
 import { PagedResult, WantedPersonSummary } from "@/src/types/wanted-person";
 import Link from "next/link";
-import { Navbar } from "@/src/components/Navbar";
 import { useReportSighting } from "@/src/lib/use-report-sighting";
 
 // --- PAGINA SAVED ---
@@ -96,7 +95,6 @@ export default function Saved() {
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           
-          <Navbar />
 
           {/* --- SEARCH BAR --- */}
           <div className="my-8 relative max-w-2xl mx-auto">

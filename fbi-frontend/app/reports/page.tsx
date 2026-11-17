@@ -2,7 +2,6 @@
 
 import AdminGuard from "@/src/components/AdminGuard";
 import { useEffect, useState } from "react";
-import { Navbar } from "@/src/components/Navbar";
 import { getReports } from "@/src/lib/api-client";
 import { ReportPagedResult, ReportItem, ReportStatus } from "@/src/types/reports";
 import { ReportDetailsModal } from "@/src/components/ReportDetailsModal";
@@ -119,7 +118,6 @@ function ReportsPageContent() {
   return (
       // 1. Fundal principal (Dark: gray-900)
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-        <Navbar />
         
         {selectedReport && (
             <ReportDetailsModal 

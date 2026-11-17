@@ -97,7 +97,7 @@ export default function MyLocationPage() {
                     {/* Titlu & Descriere */}
                     <div className="mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            📍 Setează "Home Base"
+                            📍 Setează &quot;Home Base&quot;
                         </h1>
                         <p className="text-gray-600 dark:text-gray-400 mt-2">
                             Definește locația ta principală de operare. Sistemul te va notifica automat prin 

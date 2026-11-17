@@ -71,8 +71,7 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
         const fetchHistory = async () => {
             try {
                 const res = await authFetch<Sighting[]>(`/FbiWanted/${wantedId}/sightings`);
-                // @ts-ignore 
-                const list = Array.isArray(res) ? res : res.data || [];
+                const list: Sighting[] = Array.isArray(res) ? (res as unknown as Sighting[]) : res.data || [];
                 setSightings(list);
             } catch (err) {
                 console.error("Error loading history:", err);

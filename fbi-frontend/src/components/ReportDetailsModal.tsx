@@ -10,25 +10,17 @@ interface Props {
 }
 
 export function ReportDetailsModal({ report, onClose }: Props) {
-  if (!report) return null;
-
-  // Funcție ca să închidem modalul când dăm click pe fundalul negru
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
   const [sightings, setSightings] = useState<Sighting[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
+  const wantedId = report?.wantedId;
 
   useEffect(() => {
+    if (wantedId === undefined) return;
     const fetchHistory = async () => {
         try {
-            const res = await authFetch<Sighting[]>(`/FbiWanted/${report.wantedId}/sightings`);
-            // @ts-ignore 
-            const list = Array.isArray(res) ? res : res.data || [];
+            const res = await authFetch<Sighting[]>(`/FbiWanted/${wantedId}/sightings`);
+            const list: Sighting[] = Array.isArray(res) ? (res as unknown as Sighting[]) : res.data || [];
             setSightings(list);
         } catch (err) {
             console.error("Error loading history:", err);
@@ -37,7 +29,16 @@ export function ReportDetailsModal({ report, onClose }: Props) {
         }
     };
     fetchHistory();
-  }, []);
+  }, [wantedId]);
+
+  if (!report) return null;
+
+  // Funcție ca să închidem modalul când dăm click pe fundalul negru
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
 
   return (
     // 1. BACKDROP (Fundal întunecat)

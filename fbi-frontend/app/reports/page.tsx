@@ -37,7 +37,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (!connection) return;
-    const handleReportProcessed = (message: any) => {
+    const handleReportProcessed = (message: { status?: string; reportId?: number }) => {
         if (message.status === "COMPLETED") {
             toast.success(`Analysis Complete for Report #${message.reportId}`, { icon: '🤖' });
         }

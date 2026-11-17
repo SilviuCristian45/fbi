@@ -49,9 +49,9 @@ export default function StatsPage() {
             throw new Error("SEGMENT_EXPLORER_ERROR: Failed to retrieve intelligence data.");
         }
         setStats(result.data);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Eroare la încărcarea statisticilor:", err);
-        setError(err.message || "Eroare necunoscută la conectarea cu serverul.");
+        setError((err instanceof Error && err.message) || "Eroare necunoscută la conectarea cu serverul.");
       } finally {
         setLoading(false);
       }

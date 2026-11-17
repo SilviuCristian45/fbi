@@ -1,46 +1,13 @@
 "use client";
 
-import { jwtDecode } from "jwt-decode";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
-interface Roles {
-  roles: string[]
-}
-
-interface CustomJwtPayload {
-  realm_access: Roles
-}
+import { useRole } from "@/src/lib/use-role";
 
 export const Navbar = () => {
   const pathname = usePathname();
   const router = useRouter(); // Folosim router pentru redirect mai clean
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Verificăm token-ul doar pe client
-    if (typeof window !== "undefined") {
-        const token = localStorage.getItem("token");
-        if (token) {
-        try {
-            const decoded = jwtDecode<CustomJwtPayload>(token);
-            // Verificăm structura realm_access (uneori poate lipsi)
-            const userRole = decoded.realm_access?.roles || [];
-
-            if (Array.isArray(userRole)) {
-                if (userRole.includes("ADMIN")) setRole("ADMIN");
-                else setRole("USER");
-            } else {
-                setRole(userRole || null);
-            }
-        } catch (error) {
-            console.error("Token invalid:", error);
-            setRole(null);
-        }
-        }
-    }
-  }, []);
+  const role = useRole();
 
   const handleLogout = () => {
     localStorage.removeItem("token");

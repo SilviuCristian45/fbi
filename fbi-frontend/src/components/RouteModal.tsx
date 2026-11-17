@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
+import type { Sighting } from "./SightingsList";
 
 // Importăm dinamic harta pentru a evita erorile de server (Window is not defined)
 const RouteMapInner = dynamic(() => import("./RouteMapInner"), { 
@@ -16,7 +17,7 @@ const RouteMapInner = dynamic(() => import("./RouteMapInner"), {
 interface RouteModalProps {
     isOpen: boolean;
     onClose: () => void;
-    locations: any[]; // Poți folosi tipul Sighting aici
+    locations: Sighting[];
     title: string;
 }
 

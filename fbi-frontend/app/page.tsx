@@ -243,7 +243,7 @@ export default function Home() {
                 {data?.items.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500 dark:text-gray-400">
                         <div className="text-6xl mb-4">🔍</div>
-                        <div className="text-xl font-medium">Nu am găsit rezultate pentru "{debouncedSearch}"</div>
+                        <div className="text-xl font-medium">Nu am găsit rezultate pentru &quot;{debouncedSearch}&quot;</div>
                     </div>
                 )}
             </>

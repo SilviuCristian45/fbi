@@ -32,8 +32,8 @@ export default function LoginPage() {
       } else {
         setError(result.message.join(", "));
       }
-    } catch (err: any) {
-      setError(err.message || "Login failed");
+    } catch (err) {
+      setError((err instanceof Error && err.message) || "Login failed");
     }
   };
 

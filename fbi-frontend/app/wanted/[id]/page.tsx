@@ -224,7 +224,7 @@ export default function WantedDetailPage() {
                         
                         <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
                             Datele sunt criptate și accesibile doar personalului autorizat.<br/>
-                            Folosiți butonul "Raportează" din lista principală pentru a adăuga informații noi.
+                            Folosiți butonul &quot;Raportează&quot; din lista principală pentru a adăuga informații noi.
                         </div>
                     </div>
                 </div>

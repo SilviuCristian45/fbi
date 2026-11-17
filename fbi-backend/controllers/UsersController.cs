@@ -22,19 +22,19 @@ public class UsersController : ControllerBase {
 
     [HttpGet]
     [Authorize(Roles = $"{nameof(Role.USER)},{nameof(Role.ADMIN)}")]
-    public async Task<ActionResult<ApiResponse<GetUserLocation>>> GetUserLocation()
+    public async Task<ActionResult<ApiResponse<GetUserLocation?>>> GetUserLocation()
     {
         var keycloakId = User.FindFirstValue(ClaimTypes.NameIdentifier);    
          if (string.IsNullOrEmpty(keycloakId))
          {
-            return Unauthorized(ApiResponse<GetUserLocation>.Error("Utilizatorul nu a putut fi identificat."));
+            return Unauthorized(ApiResponse<GetUserLocation?>.Error("Utilizatorul nu a putut fi identificat."));
          }
         var result = await _service.getUserLocation(keycloakId);
         if (result.Success == false) 
         {
-            return BadRequest(ApiResponse<GetUserLocation>.Error(result.ErrorMessage));
+            return BadRequest(ApiResponse<GetUserLocation?>.Error(result.ErrorMessage));
         }
-        return Ok(ApiResponse<GetUserLocation>.Success(result.Data));
+        return Ok(ApiResponse<GetUserLocation?>.Success(result.Data));
     }
 
 

@@ -18,15 +18,19 @@ public class UsersService: IUsersService {
         _logger = logger;
     }
 
-    public async Task<ServiceResult<GetUserLocation>> getUserLocation(string userId) {
+    public async Task<ServiceResult<GetUserLocation?>> getUserLocation(string userId) {
         try {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
-            return ServiceResult<GetUserLocation>.Ok(
+            // Randul din Users apare abia la primul setUserLocation; pana atunci nu exista locatie salvata
+            if (user == null) {
+                return ServiceResult<GetUserLocation?>.Ok(null);
+            }
+            return ServiceResult<GetUserLocation?>.Ok(
                 new GetUserLocation(user.Latitude, user.Longitude)
             );
         } catch (Exception ex) {
             _logger.LogError(ex.Message);
-            return ServiceResult<GetUserLocation>.Fail(ex.Message);
+            return ServiceResult<GetUserLocation?>.Fail(ex.Message);
         }
     }
 

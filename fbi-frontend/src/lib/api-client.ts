@@ -152,6 +152,6 @@ export async function getReports(
   return authFetch<ReportPagedResult>(`/FbiWanted/reports?${params.toString()}`);
 }
 
-export async function getUserLocation(): Promise<ApiResponse<LocationDto>> {
-  return authFetch<LocationDto>(`/Users`);
+export async function getUserLocation(): Promise<ApiResponse<LocationDto | null>> {
+  return authFetch<LocationDto | null>(`/Users`);
 }

@@ -22,8 +22,8 @@ export default function MyLocationPage() {
             console.log("Saving Home Location:", position);
             
             getUserLocation().then( data => {
-                console.log('locatie user curent')
-                console.log(data.data.latitude + ' ' + data.data.longitude)
+                // data null = userul nu si-a salvat inca locatia
+                if (!data.data) return;
                 setPosition([data.data.latitude, data.data.longitude]);
             }).catch(err => {
                 console.error(err);

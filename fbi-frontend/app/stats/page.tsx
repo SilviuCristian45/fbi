@@ -15,6 +15,15 @@ import {
   Bar,
 } from "recharts";
 import { ApiResponse } from "@/src/types/api";
+import { Activity, BarChart3, MapPin, Users, type LucideIcon } from "lucide-react";
+import { useTokenColors } from "@/src/lib/use-token-colors";
+import { formatCount } from "@/src/lib/format";
+import { PageContainer } from "@/src/components/layout/AppShell";
+import { PageHeader } from "@/src/components/ui/PageHeader";
+import { Card, CardHeader, CardBody } from "@/src/components/ui/Card";
+import { Button } from "@/src/components/ui/Button";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { Skeleton, LoadingStatus } from "@/src/components/ui/Skeleton";
 
 // --- TIPURI DE DATE ---
 interface ChartDataPoint {
@@ -69,182 +78,147 @@ function StatsPageContent() {
   }, []);
 
   // --- RENDERING ---
+  return (
+    <PageContainer>
+      <PageHeader
+        overline="Admin"
+        title="Statistics"
+        description="Activity of the sighting reports and the most reported people."
+      />
+      <StatsBody stats={stats} loading={loading} error={error} />
+    </PageContainer>
+  );
+}
+
+function StatsBody({ stats, loading, error }: { stats: DashboardStats | null; loading: boolean; error: string | null }) {
+  const colors = useTokenColors();
 
   // Cazul 1: Loading
   if (loading) {
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors flex flex-col items-center justify-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 dark:border-blue-400"></div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400 font-mono animate-pulse">Analyzing Intelligence Data...</p>
+      <div className="grid gap-6">
+        <LoadingStatus label="Loading statistics…" />
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-28" />)}
         </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-80" />
+          <Skeleton className="h-80" />
+        </div>
+      </div>
     );
   }
 
   // Cazul 2: Eroare
   if (error) {
     return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors flex flex-col items-center justify-center p-4">
-                <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100 dark:border-red-900/50">
-                    <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-6">
-                        <svg className="h-8 w-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">System Alert</h3>
-                    <p className="text-red-500 dark:text-red-300 font-mono text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 break-words">
-                        {error}
-                    </p>
-                    <button 
-                        onClick={() => window.location.reload()}
-                        className="mt-6 w-full bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition-colors"
-                    >
-                        Retry Connection ↻
-                    </button>
-                </div>
-            </div>
+      <Card>
+        <EmptyState
+          variant="error"
+          title="Statistics could not be loaded"
+          description={<>The server did not return the statistics. <span className="block font-mono text-xs">{error}</span></>}
+          action={<Button onClick={() => window.location.reload()}>Try again</Button>}
+        />
+      </Card>
     );
   }
 
   // Cazul 3: Date lipsă
   if (!stats) {
-    return <div className="p-10 text-center text-gray-500 dark:text-gray-400">No data available.</div>;
+    return <Card><EmptyState title="No data available" /></Card>;
   }
 
   // Cazul 4: Success
+  const avg = stats.totalSuspects > 0 ? stats.totalSightings / stats.totalSuspects : 0;
+  const hasActivity = stats.activityLast7Days.some((d) => d.count > 0);
+  const spotted = stats.topSuspects.filter((s) => s.sightingsCount > 0);
+  const axis = { stroke: colors?.muted, fontSize: 12, tickLine: false, axisLine: false } as const;
+  const tooltip = {
+    contentStyle: { background: colors?.surface, color: colors?.fg, border: `1px solid ${colors?.border}`, borderRadius: 8 },
+    labelStyle: { color: colors?.fg, fontWeight: 600 },
+    itemStyle: { color: colors?.fg },
+  };
+
   return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 pb-20">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6">
+    <div className="grid gap-6">
+      {/* --- SECȚIUNEA 1: KPI CARDS --- */}
+      <dl className="grid gap-4 sm:grid-cols-3">
+        <Kpi icon={Users} label="People on the list" value={formatCount(stats.totalSuspects)} />
+        <Kpi icon={MapPin} label="Sighting reports" value={formatCount(stats.totalSightings)} />
+        <Kpi icon={Activity} label="Reports per person" value={avg.toFixed(2)} hint="Average across the whole list" />
+      </dl>
 
-          <div className="mb-8 mt-6">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">📊 Intelligence Dashboard</h1>
-            <p className="text-gray-500 dark:text-gray-400">Analiză în timp real a activității operative.</p>
-          </div>
-
-          {/* --- SECȚIUNEA 1: KPI CARDS --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            
-            {/* Card 1: Total Suspecți */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Targets</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalSuspects}</p>
-                </div>
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full text-red-600 dark:text-red-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 2: Total Raportări */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Intel Reports</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalSightings}</p>
-                </div>
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600 dark:text-blue-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 3: Eficiență */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg. Sightings / Target</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {stats.totalSuspects > 0 
-                        ? (stats.totalSightings / stats.totalSuspects).toFixed(2) 
-                        : "0"} %
-                  </p>
-                </div>
-                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full text-green-600 dark:text-green-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* --- SECȚIUNEA 2: GRAFICE --- */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* Grafic 1: Activitate 7 Zile */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">📈 Activity (Last 7 Days)</h3>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.activityLast7Days} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+      {/* --- SECȚIUNEA 2: GRAFICE --- */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="Reports in the last 7 days" />
+          <CardBody>
+            {!hasActivity ? (
+              <EmptyState className="h-[300px] py-0" icon={BarChart3} title="No reports this week" description="New sightings will show up here day by day." />
+            ) : (
+              <div className="h-[300px] w-full" role="img" aria-label={`Reports per day: ${stats.activityLast7Days.map((d) => `${d.date} ${d.count}`).join(", ")}`}>
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 520, height: 300 }}>
+                  <AreaChart data={stats.activityLast7Days} margin={{ top: 10, right: 16, left: -16, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor={colors?.primary} stopOpacity={0.35}/>
+                        <stop offset="95%" stopColor={colors?.primary} stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" strokeOpacity={0.2} />
-                    <Tooltip 
-                        contentStyle={{ backgroundColor: '#1F2937', color: '#fff', borderRadius: '8px', border: '1px solid #374151' }}
-                        itemStyle={{ color: '#60A5FA' }}
-                    />
-                    <Area 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#3B82F6" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorCount)" 
-                        name="Rapoarte"
-                    />
+                    <XAxis dataKey="date" {...axis} />
+                    <YAxis allowDecimals={false} {...axis} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={colors?.border} />
+                    <Tooltip {...tooltip} cursor={{ stroke: colors?.border }} />
+                    <Area type="monotone" dataKey="count" stroke={colors?.primary} strokeWidth={2.5} fillOpacity={1} fill="url(#colorCount)" name="Reports" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            )}
+          </CardBody>
+        </Card>
 
-            {/* Grafic 2: Top Suspecți */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">🔥 Most Spotted Targets</h3>
-              {stats.topSuspects.length === 0 ? (
-                  <div className="h-[300px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-                      Nu există suficiente date.
-                  </div>
-              ) : (
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={stats.topSuspects} margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#374151" strokeOpacity={0.2} />
-                        <XAxis type="number" hide />
-                        <YAxis 
-                            dataKey="name" 
-                            type="category" 
-                            width={100} 
-                            stroke="#9CA3AF" 
-                            fontSize={11} 
-                            tickLine={false} 
-                            axisLine={false}
-                        />
-                        <Tooltip 
-                            cursor={{fill: '#374151', opacity: 0.2}}
-                            contentStyle={{ backgroundColor: '#1F2937', color: '#fff', borderRadius: '8px', border: '1px solid #374151' }}
-                        />
-                        <Bar dataKey="sightingsCount" fill="#EF4444" radius={[0, 4, 4, 0]} barSize={20} name="Observații" />
-                    </BarChart>
-                    </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-
-          </div>
-        </div>
+        <Card>
+          <CardHeader title="Most reported people" />
+          <CardBody>
+            {spotted.length === 0 ? (
+              <EmptyState className="h-[300px] py-0" icon={Users} title="No sightings yet" description="People appear here once they have been reported at least once." />
+            ) : (
+              <div className="h-[300px] w-full" role="img" aria-label={`Sightings per person: ${spotted.map((s) => `${s.name} ${s.sightingsCount}`).join(", ")}`}>
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 520, height: 300 }}>
+                  <BarChart layout="vertical" data={spotted} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={colors?.border} />
+                    <XAxis type="number" allowDecimals={false} {...axis} />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={150}
+                      {...axis}
+                      tickFormatter={(name: string) => (name.length > 22 ? `${name.slice(0, 21)}…` : name)}
+                    />
+                    <Tooltip {...tooltip} cursor={{ fill: colors?.subtle }} />
+                    <Bar dataKey="sightingsCount" fill={colors?.alert} radius={[0, 4, 4, 0]} barSize={18} name="Sightings" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
+    </div>
+  );
+}
+
+function Kpi({ icon: Icon, label, value, hint }: { icon: LucideIcon; label: string; value: string; hint?: string }) {
+  return (
+    <Card className="flex items-start justify-between gap-4 p-5">
+      <div>
+        <dt className="text-[13px] font-semibold uppercase tracking-wider text-muted">{label}</dt>
+        <dd className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">{value}</dd>
+        {hint && <dd className="text-sm text-muted">{hint}</dd>}
+      </div>
+      <span className="grid size-10 place-items-center rounded-md bg-primary-soft text-primary" aria-hidden="true">
+        <Icon className="size-5" />
+      </span>
+    </Card>
   );
 }

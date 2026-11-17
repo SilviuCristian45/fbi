@@ -1,17 +1,25 @@
 "use client";
 
-import { useState, useEffect, DragEvent } from "react";
+import { useState, useEffect, DragEvent, useId } from "react";
 import dynamic from "next/dynamic";
+import { ImagePlus, Loader2, MapPin, Send, X } from "lucide-react";
+import { Modal } from "./ui/Modal";
+import { Button } from "./ui/Button";
+import { Field, Textarea } from "./ui/Input";
+import { Skeleton } from "./ui/Skeleton";
+import { cn } from "../lib/cn";
 
-const MapInner = dynamic(() => import("./MapInner"), { 
+const MapInner = dynamic(() => import("./MapInner"), {
     ssr: false,
-    loading: () => <div className="h-full w-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-300">Se încarcă harta... 🌍</div>
+    loading: () => <Skeleton className="h-full w-full rounded-none" />
 });
+
+const ADDRESS_PREFIX = "Estimated address:";
 
 interface MapModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (lat: number, lng: number, details: string, fileUrl: File | null) => void;
+  onSubmit: (lat: number, lng: number, details: string, fileUrl: File | null) => void | Promise<void>;
   personName: string;
 }
 
@@ -20,7 +28,10 @@ export default function MapModal({ isOpen, onClose, onSubmit, personName }: MapM
   const [details, setDetails] = useState("");
   const [addressLoading, setAddressLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const fileInputId = useId();
+
   // State pentru efectul vizual la Drag & Drop
   const [isDragging, setIsDragging] = useState(false);
 
@@ -32,14 +43,26 @@ export default function MapModal({ isOpen, onClose, onSubmit, personName }: MapM
         setAddressLoading(false);
         setSelectedFile(null);
         setIsDragging(false);
+        setSending(false);
     }
   }, [isOpen]);
+
+  // Preview for the chosen photo (object URL released when it changes).
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
 
   // Căutare adresă
   useEffect(() => {
     if (!position) return;
     const [lat, lng] = position;
-    
+
     const fetchAddress = async () => {
         setAddressLoading(true);
         try {
@@ -47,8 +70,8 @@ export default function MapModal({ isOpen, onClose, onSubmit, personName }: MapM
             const data = await res.json();
 
             if (data && data.display_name) {
-                const adresa = `📍 Adresă estimată: ${data.display_name}\n\n`;
-                setDetails(prev => adresa + (prev.includes("Adresă estimată") ? prev.split("\n\n")[1] || "" : prev));
+                const adresa = `${ADDRESS_PREFIX} ${data.display_name}\n\n`;
+                setDetails(prev => adresa + (prev.includes(ADDRESS_PREFIX) ? prev.split("\n\n")[1] || "" : prev));
             }
         } catch (error) {
             console.error("Nu am putut găsi adresa:", error);
@@ -85,7 +108,7 @@ export default function MapModal({ isOpen, onClose, onSubmit, personName }: MapM
       if (file.type.startsWith("image/")) {
         setSelectedFile(file);
       } else {
-        alert("Te rugăm să încarci doar fișiere de tip imagine (JPG, PNG, etc).");
+        alert("Please upload an image file (JPG, PNG, GIF).");
       }
     }
   };
@@ -100,122 +123,114 @@ export default function MapModal({ isOpen, onClose, onSubmit, personName }: MapM
     }
   };
 
-  if (!isOpen) return null;
+  const handleSend = async () => {
+    if (!position) return;
+    setSending(true);
+    try {
+      await onSubmit(position[0], position[1], details, selectedFile);
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col max-h-[95vh] transition-colors">
-        
-        {/* Header */}
-        <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-          <h3 className="font-bold text-lg">Raportează Locație: {personName}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      title={<>Report a sighting{personName && <span className="block text-base font-semibold text-muted">{personName}</span>}</>}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSend} disabled={!position} loading={sending}>
+            {!sending && <Send className="size-4" aria-hidden="true" />}
+            Send report
+          </Button>
+        </>
+      }
+    >
+        {/* Map Body */}
+        <div className="relative h-72 w-full border-b border-border bg-subtle sm:h-80">
+            <MapInner position={position} setPosition={setPosition} />
+            {!position && (
+                <div className="pointer-events-none absolute left-1/2 top-3 z-[400] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-fg px-4 py-2 text-sm font-semibold text-bg shadow-pop">
+                    <MapPin className="size-4" aria-hidden="true" /> Tap the map where you saw them
+                </div>
+            )}
         </div>
 
-        <div className="overflow-y-auto flex-grow">
-            
-            {/* Map Body */}
-            <div className="relative w-full h-80 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
-                <MapInner position={position} setPosition={setPosition} />
-                {!position && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full text-sm font-bold shadow-md border border-yellow-200 pointer-events-none">
-                        📍 Apasă pe hartă pentru a pune pinul
-                    </div>
-                )}
-            </div>
+        {/* Zona de Detalii */}
+        <div className="grid gap-5 p-5">
+            <p className="text-sm text-muted" aria-live="polite">
+                {position
+                  ? <>Location set: <span className="font-mono text-fg">{position[0].toFixed(5)}, {position[1].toFixed(5)}</span>{addressLoading && <span className="ml-2 inline-flex items-center gap-1"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" /> Looking up the address…</span>}</>
+                  : "No location selected yet."}
+            </p>
 
-            {/* Zona de Detalii */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-900 space-y-4 transition-colors">
-                <div className="flex justify-between items-center">
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Detalii suplimentare
-                    </label>
-                    {addressLoading && <span className="text-xs text-blue-600 dark:text-blue-400 animate-pulse">Se caută adresa... 🛰️</span>}
-                </div>
-                
-                <textarea 
+            <Field label="What did you see?" hint="When, where exactly, what they were wearing, direction of travel.">
+                <Textarea
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
-                    placeholder="Ex: L-am văzut ieșind dintr-un magazin..."
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm min-h-[100px] resize-y 
-                               bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                    placeholder="E.g. I saw him leaving a shop on the corner, around 6 pm…"
                 />
+            </Field>
 
-                {/* 👇 ZONA DE UPLOAD DRAG & DROP (DOAR IMAGINI) */}
-               <div 
-                   onDragOver={handleDragOver}
-                   onDragLeave={handleDragLeave}
-                   onDrop={handleDrop}
-                   className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer group relative
-                       ${isDragging 
-                           ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.02]" 
-                           : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-                       }`}
-               >
-                   <label className="cursor-pointer block w-full h-full">
-                       <div className="flex flex-col items-center justify-center gap-2">
-                           {selectedFile ? (
-                               <>
-                                 <span className="text-3xl">🖼️</span>
-                                 <span className="text-gray-700 dark:text-gray-200 font-bold truncate max-w-[200px]">
-                                    {selectedFile.name}
-                                 </span>
-                                 <span className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
-                               </>
-                           ) : (
-                               <>
-                                 <span className="text-3xl mb-1">{isDragging ? "📂" : "☁️"}</span>
-                                 <span className="text-gray-600 dark:text-gray-400 text-sm font-semibold group-hover:text-blue-500 transition-colors">
-                                     {isDragging ? "Eliberează imaginea aici!" : "Trage o poză aici sau dă click"}
-                                 </span>
-                                 <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                     Format suportat: JPG, PNG, GIF
-                                 </span>
-                               </>
-                           )}
-                       </div>
+            {/* ZONA DE UPLOAD DRAG & DROP (DOAR IMAGINI) */}
+            <div className="grid gap-1.5">
+              <span className="text-sm font-semibold">Photo (optional)</span>
+              <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={cn(
+                    "relative rounded-lg border-2 border-dashed transition-colors focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-focus",
+                    isDragging ? "border-primary bg-primary-soft" : "border-border hover:bg-subtle",
+                  )}
+              >
+                  <input
+                      id={fileInputId}
+                      type="file"
+                      className="sr-only"
+                      accept="image/*" // Restricție doar imagini
+                      onChange={handleFileSelect}
+                  />
+                  <label htmlFor={fileInputId} className="flex cursor-pointer items-center gap-4 p-4">
+                      {selectedFile && previewUrl ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
+                            <img src={previewUrl} alt="" className="size-16 shrink-0 rounded-md object-cover" />
+                            <span className="min-w-0">
+                              <span className="block truncate font-semibold">{selectedFile.name}</span>
+                              <span className="text-sm text-muted">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB · click to replace</span>
+                            </span>
+                          </>
+                      ) : (
+                          <>
+                            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-subtle text-muted">
+                              <ImagePlus className="size-6" aria-hidden="true" />
+                            </span>
+                            <span>
+                              <span className="block font-semibold">{isDragging ? "Drop the photo here" : "Drag a photo here or choose a file"}</span>
+                              <span className="text-sm text-muted">JPG, PNG or GIF. It is compared automatically with the wanted list.</span>
+                            </span>
+                          </>
+                      )}
+                  </label>
 
-                       <input 
-                           type="file" 
-                           className="hidden" 
-                           accept="image/*" // Restricție doar imagini
-                           onChange={handleFileSelect}
-                       />
-                   </label>
-                   
-                   {/* Buton ștergere peste zonă */}
-                   {selectedFile && (
-                       <button 
-                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFile(null); }}
-                         className="absolute top-2 right-2 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"
-                         title="Șterge imaginea"
-                       >
-                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                           <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                         </svg>
-                       </button>
-                   )}
+                  {/* Buton ștergere peste zonă */}
+                  {selectedFile && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFile(null); }}
+                        className="absolute right-2 top-2 grid size-8 place-items-center rounded-md text-muted hover:bg-alert-soft hover:text-alert"
+                        aria-label="Remove photo"
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </button>
+                  )}
               </div>
             </div>
         </div>
-
-        {/* Footer Actions */}
-        <div className="p-4 bg-white dark:bg-gray-800 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700 shrink-0 transition-colors">
-          <button 
-            onClick={onClose} 
-            className="px-4 py-2 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
-              Anulează
-          </button>
-          <button 
-            onClick={() => position && onSubmit(position[0], position[1], details, selectedFile)}
-            disabled={!position}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 shadow-lg dark:bg-blue-600 dark:hover:bg-blue-500"
-          >
-            <span>Trimite Raport</span> 🚀
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

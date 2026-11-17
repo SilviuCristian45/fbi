@@ -2,13 +2,19 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Navbar } from "@/src/components/Navbar";
-import { authFetch, getUserLocation } from "@/src/lib/api-client"; // Presupunem că vom avea endpoint-ul
+import { toast } from "react-hot-toast";
+import { Crosshair, Home, LocateFixed, MapPin } from "lucide-react";
+import { authFetch, getUserLocation } from "@/src/lib/api-client";
+import { PageContainer } from "@/src/components/layout/AppShell";
+import { PageHeader } from "@/src/components/ui/PageHeader";
+import { Card } from "@/src/components/ui/Card";
+import { Button } from "@/src/components/ui/Button";
+import { Skeleton } from "@/src/components/ui/Skeleton";
 
 // Import dinamic pentru hartă (fix SSR)
 const MapInner = dynamic(() => import("@/src/components/MapInner"), {
     ssr: false,
-    loading: () => <div className="h-96 w-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse text-gray-500">Se încarcă harta... 🌍</div>
+    loading: () => <Skeleton className="h-full w-full rounded-none" />
 });
 
 export default function MyLocationPage() {
@@ -19,11 +25,10 @@ export default function MyLocationPage() {
     useEffect( () => {
         setLoading(true);
         try {
-            console.log("Saving Home Location:", position);
             
             getUserLocation().then( data => {
-                console.log('locatie user curent')
-                console.log(data.data.latitude + ' ' + data.data.longitude)
+                // data null = userul nu si-a salvat inca locatia
+                if (!data.data) return;
                 setPosition([data.data.latitude, data.data.longitude]);
             }).catch(err => {
                 console.error(err);
@@ -40,7 +45,7 @@ export default function MyLocationPage() {
 
     const handleGetGPS = () => {
         if (!navigator.geolocation) {
-            alert("Browserul tău nu suportă geolocația.");
+            toast.error("Your browser does not support geolocation.");
             return;
         }
 
@@ -54,21 +59,19 @@ export default function MyLocationPage() {
             },
             (err) => {
                 console.error(err);
-                alert("Nu am putut obține locația. Verifică permisiunile browserului.");
+                toast.error("Your location could not be read. Check the browser permissions.");
                 setGeoLoading(false);
             },
             { enableHighAccuracy: true } // Cere precizie maximă
         );
     };
 
-    // Funcția care trimite datele la backend (o vom lega de endpoint-ul C# mai târziu)
+    // Funcția care trimite datele la backend
     const  handleSetHome = async () => {
         if (!position) return;
         setLoading(true);
         try {
-            console.log("Saving Home Location:", position);
             
-           // TODO: Aici vom apela API-ul când e gata backend-ul
             await authFetch("/Users", { 
                method: "POST", 
                headers: { "Content-Type": "application/json" },
@@ -77,96 +80,71 @@ export default function MyLocationPage() {
 
             // Simulare succes
             await new Promise(r => setTimeout(r, 1000));
-            alert(`Succes! Locația Home a fost setată la coordonatele:\nLat: ${position[0]}\nLng: ${position[1]}`);
+            toast.success(`Home location saved: ${position[0].toFixed(5)}, ${position[1].toFixed(5)}`);
             
         } catch (error) {
             console.error(error);
-            alert("Eroare la salvarea locației.");
+            toast.error("The location could not be saved. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
-                <Navbar />
+        <PageContainer>
+            <PageHeader
+                overline="Alerts"
+                title="My location"
+                description={<>Set your home location. You get a live alert when someone on the list is reported <strong className="text-fg">within 10 km</strong> of it.</>}
+            />
 
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-colors">
-                    
-                    {/* Titlu & Descriere */}
-                    <div className="mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            📍 Setează "Home Base"
-                        </h1>
-                        <p className="text-gray-600 dark:text-gray-400 mt-2">
-                            Definește locația ta principală de operare. Sistemul te va notifica automat prin 
-                            <span className="font-bold text-blue-600 dark:text-blue-400"> Geofencing Alert</span> dacă un suspect este raportat pe o rază de 
-                            <span className="font-bold text-red-600 dark:text-red-400"> 10km</span> în jurul acestui punct.
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                {/* Harta */}
+                <Card className="relative h-[420px] overflow-hidden sm:h-[520px]">
+                    <MapInner position={position} setPosition={setPosition} />
+                    {!position && (
+                        <div className="pointer-events-none absolute left-1/2 top-3 z-[400] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-fg px-4 py-2 text-sm font-semibold text-bg shadow-pop">
+                            <MapPin className="size-4" aria-hidden="true" /> Tap the map to set your home
+                        </div>
+                    )}
+                </Card>
+
+                {/* Panou acțiuni */}
+                <Card className="grid gap-5 p-5">
+                    <div>
+                        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Selected point</h2>
+                        <p className="mt-1 font-mono text-sm" aria-live="polite">
+                            {position ? `${position[0].toFixed(5)}, ${position[1].toFixed(5)}` : "No location selected"}
                         </p>
                     </div>
 
-                    {/* Harta */}
-                    <div className="h-[500px] w-full bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 relative shadow-inner">
-                         <MapInner position={position} setPosition={setPosition} />
-                         
-                         {!position && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] bg-blue-600/90 backdrop-blur text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg border border-blue-400 pointer-events-none animate-bounce">
-                                👇 Dă click pe hartă pentru a seta casa!
-                            </div>
-                        )}
-                    </div>
+                    <div className="grid gap-3">
+                        <Button
+                            variant="secondary"
+                            onClick={handleGetGPS}
+                            disabled={geoLoading || loading}
+                            loading={geoLoading}
+                        >
+                            {!geoLoading && <LocateFixed className="size-4" aria-hidden="true" />}
+                            {geoLoading ? "Finding you…" : "Use my current location"}
+                        </Button>
 
-                    {/* Footer cu Buton */}
-                    <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                            {position ? `Coordonate selectate: ${position[0].toFixed(5)}, ${position[1].toFixed(5)}` : "Nicio locație selectată"}
-                        </div>
-
-
-                        {/* --- 2. BUTON GPS NOU --- */}
-                            <button
-                                onClick={handleGetGPS}
-                                disabled={geoLoading || loading}
-                                className="px-6 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-white bg-blue-500 hover:bg-blue-600 hover:-translate-y-0.5 shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {geoLoading ? (
-                                    <>
-                                        <span className="animate-spin">📡</span> Căutare GPS...
-                                    </>
-                                ) : (
-                                    <>
-                                        🛰️ Detectează Automat
-                                    </>
-                                )}
-                            </button>
-
-                        <button
+                        <Button
                             onClick={handleSetHome}
                             disabled={!position || loading}
-                            className={`
-                                px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center gap-2 text-white
-                                ${!position || loading 
-                                    ? "bg-gray-400 cursor-not-allowed opacity-50" 
-                                    : "bg-green-600 hover:bg-green-700 hover:-translate-y-0.5 shadow-green-500/30"
-                                }
-                            `}
+                            loading={loading}
                         >
-                            {loading ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Se salvează...
-                                </>
-                            ) : (
-                                <>
-                                    🏡 Salvează Locația Manual Home
-                                </>
-                            )}
-                        </button>
+                            {!loading && <Home className="size-4" aria-hidden="true" />}
+                            {loading ? "Saving…" : "Save as home"}
+                        </Button>
                     </div>
 
-                </div>
+                    <p className="flex gap-2 text-sm text-muted">
+                        <Crosshair className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        You can also drag the map and tap a new point; save again to update it.
+                    </p>
+                </Card>
             </div>
-        </main>
+        </PageContainer>
     );
 }

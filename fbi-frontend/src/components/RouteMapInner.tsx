@@ -45,6 +45,8 @@ export default function RouteMapInner({ locations }: RouteMapInnerProps) {
             <TileLayer
                 attribution='&copy; OpenStreetMap'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                // OSM cere Referer (altfel 403 "Access blocked"); suprascrie no-referrer din layout.tsx
+                referrerPolicy="strict-origin-when-cross-origin"
             />
 
             {/* Linia Roșie care unește punctele */}

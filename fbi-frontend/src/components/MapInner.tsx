@@ -44,6 +44,8 @@ export default function MapInner({ position, setPosition }: MapInnerProps) {
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                // OSM cere Referer (altfel 403 "Access blocked"); suprascrie no-referrer din layout.tsx
+                referrerPolicy="strict-origin-when-cross-origin"
             />
             
             {/* Aceasta componentă invizibilă ascultă click-urile */}

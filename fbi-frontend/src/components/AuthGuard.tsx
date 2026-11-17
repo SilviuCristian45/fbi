@@ -5,6 +5,7 @@ import { Toaster, toast } from "react-hot-toast";
 import { usePathname, useRouter } from "next/navigation";
 import { SignalRProvider, useSignalR } from "../context/SignalRContext";
 import { useEffect, useState, useRef } from "react";
+import { playAlertTone } from "../lib/alert-sound";
 
 // --- HELPER TOKEN ---
 function getStoredToken() {
@@ -48,8 +49,7 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
                     
                     conn.off("ReceiveUrgentAlert");
                     conn.on("ReceiveUrgentAlert", (msg) => {
-                        const audio = new Audio('/sounds/alarm.mp3');
-                        audio.play().catch(() => {});
+                        playAlertTone();
                         toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
                     });
 

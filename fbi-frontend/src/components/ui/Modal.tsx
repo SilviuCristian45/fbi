@@ -17,6 +17,9 @@ interface ModalProps {
   children: React.ReactNode;
 }
 
+// Open modals, innermost last: only the top one reacts to Esc and Tab.
+const openStack: string[] = [];
+
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // Not a native <dialog>: that renders in the top layer and would hide the live SignalR toasts.
@@ -33,6 +36,8 @@ export function Modal({ open, onClose, title, description, footer, size = "lg", 
 
   useEffect(() => {
     if (!open) return;
+    openStack.push(titleId);
+    const isTop = () => openStack[openStack.length - 1] === titleId;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
@@ -42,6 +47,7 @@ export function Modal({ open, onClose, title, description, footer, size = "lg", 
     (first ?? panel)?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!isTop()) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         onCloseRef.current();
@@ -63,11 +69,12 @@ export function Modal({ open, onClose, title, description, footer, size = "lg", 
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
+      openStack.splice(openStack.indexOf(titleId), 1);
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = overflow;
       previouslyFocused?.focus?.();
     };
-  }, [open]);
+  }, [open, titleId]);
 
   if (!open) return null;
 

@@ -163,3 +163,6 @@ body {
   border: 2px solid var(--surface);
   box-shadow: var(--elev-card);
 }
+.route-line {
+  stroke: var(--primary);
+}

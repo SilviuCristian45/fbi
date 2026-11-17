@@ -2,9 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/src/lib/api-client";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
+import { ExternalLink, Map as MapIcon, Video } from "lucide-react";
 import RouteModal from "./RouteModal";
-import { useSignalR } from "../context/SignalRContext"; 
+import { useSignalR } from "../context/SignalRContext";
+import { AlertToast } from "./ui/Toast";
+import { Button } from "./ui/Button";
+import { Card } from "./ui/Card";
+import { Badge } from "./ui/Badge";
+import { Skeleton, LoadingStatus } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
+import { formatDateTime } from "../lib/format";
+import { cn } from "../lib/cn";
 
 export interface Sighting {
     id: number;
@@ -44,25 +53,9 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
 
     const showTacticalToast = (report: Sighting) => {
         toast.custom((t) => (
-            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-slate-900 shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 border-l-4 border-red-500`}>
-                <div className="flex-1 w-0 p-4">
-                    <div className="flex items-start">
-                        <div className="flex-shrink-0 pt-0.5">
-                            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-800">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-20"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                            </div>
-                        </div>
-                        <div className="ml-3 flex-1">
-                            <p className="text-sm font-bold text-red-400 uppercase tracking-wider">New Intel Received</p>
-                            <p className="mt-1 text-sm text-gray-300">Agent <span className="text-white font-semibold">{report.reportedBy}</span> a raportat o locație nouă!</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex border-l border-slate-700">
-                    <button onClick={() => toast.dismiss(t.id)} className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-gray-400 hover:text-white focus:outline-none">Close</button>
-                </div>
-            </div>
+            <AlertToast t={t} title="New sighting reported">
+                <span className="font-semibold text-fg">{report.reportedBy}</span> reported a new location for this person.
+            </AlertToast>
         ), { duration: 5000, position: "top-right" });
     };
 
@@ -104,110 +97,116 @@ export default function SightingsList({ wantedId }: { wantedId: number }) {
     }, [connection, wantedId]);
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors">
-            <Toaster />
-            <RouteModal 
+        <Card className="overflow-hidden">
+            <RouteModal
                 isOpen={isRouteModalOpen}
                 onClose={() => setIsRouteModalOpen(false)}
                 locations={sightings}
-                title={`Target #${wantedId}`}
+                title={`Person #${wantedId}`}
             />
 
-            <div className="bg-slate-900 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-                <h3 className="font-bold text-white flex items-center gap-2">
-                    <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                    </span>
-                    Live Intelligence Feed
-                </h3>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded hidden sm:inline-block">Secured Channel</span>
-                    <button 
-                        onClick={() => setIsRouteModalOpen(true)}
-                        disabled={sightings.length === 0}
-                        className="ml-2 sm:ml-4 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        View Route 🗺️
-                    </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-bold tracking-tight">Sightings</h2>
+                    {!loading && <Badge tone="neutral">{sightings.length}</Badge>}
                 </div>
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsRouteModalOpen(true)}
+                    disabled={sightings.length === 0}
+                >
+                    <MapIcon className="size-4" aria-hidden="true" /> View route
+                </Button>
             </div>
 
-            <div className="max-h-[400px] overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+            <div className="max-h-[560px] overflow-y-auto" aria-live="polite">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-500 dark:text-gray-400">Se decriptează datele...</div>
+                    <div className="grid gap-4 p-5">
+                        <LoadingStatus label="Loading sightings…" />
+                        {[0, 1].map(i => (
+                            <div key={i} className="grid gap-2">
+                                <Skeleton className="h-4 w-1/2" />
+                                <Skeleton className="h-4 w-4/5" />
+                                <Skeleton className="h-32 w-full" />
+                            </div>
+                        ))}
+                    </div>
                 ) : sightings.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 dark:text-gray-500 italic">Nicio raportare recentă în baza de date.</div>
+                    <EmptyState
+                        className="py-10"
+                        icon={MapIcon}
+                        title="No sightings yet"
+                        description="Seen this person? Use “Report a sighting” on this page."
+                    />
                 ) : (
-                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    <ol className="divide-y divide-border">
                         {sightings.map((report) => {
                             const isNew = report.id === highlightId;
                             return (
-                                <div 
-                                    key={report.id} 
-                                    className={`p-4 transition-all duration-1000 
-                                        ${isNew 
-                                            ? "bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 shadow-inner" 
-                                            : "hover:bg-slate-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent"
-                                        }`}
+                                <li
+                                    key={report.id}
+                                    className={cn(
+                                        "border-l-4 px-5 py-4 transition-colors duration-700",
+                                        isNew ? "border-l-alert bg-alert-soft" : "border-l-transparent",
+                                    )}
                                 >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className={`font-bold text-sm ${isNew ? 'text-red-800 dark:text-red-300' : 'text-blue-700 dark:text-blue-400'}`}>Agent {report.reportedBy}</span>
-                                            <span className="text-xs text-gray-400 dark:text-gray-500">• {new Date(report.timestamp).toLocaleString()}</span>
-                                            {isNew && <span className="text-xs bg-red-500 text-white px-1.5 rounded font-bold animate-pulse">NEW</span>}
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="font-semibold">
+                                                {report.reportedBy}
+                                                {isNew && <Badge tone="suspect" className="ml-2 align-middle">New</Badge>}
+                                            </p>
+                                            <p className="text-sm text-muted"><time dateTime={report.timestamp}>{formatDateTime(report.timestamp)}</time></p>
                                         </div>
-                                        <a 
-                                            href={`https://www.google.com/maps/search/?api=1&query=${report.lat},${report.lng}`} 
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${report.lat},${report.lng}`}
                                             target="_blank" rel="noopener noreferrer"
-                                            className="text-xs bg-gray-100 hover:bg-blue-100 text-gray-600 hover:text-blue-700 dark:bg-gray-700 dark:hover:bg-blue-900 dark:text-gray-300 dark:hover:text-blue-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600 transition-colors whitespace-nowrap ml-2"
+                                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline"
                                         >
-                                            Harta 🗺️
+                                            Open in maps <ExternalLink className="size-3.5" aria-hidden="true" />
+                                            <span className="sr-only">(opens in a new tab)</span>
                                         </a>
                                     </div>
-                                    
-                                    <p className="text-gray-800 dark:text-gray-200 text-sm mt-2 font-medium break-words">{report.details}</p>
+
+                                    {report.details && <p className="mt-2 whitespace-pre-line break-words">{report.details}</p>}
 
                                     {/* 👇 AFISARE MEDIA */}
                                     {report.fileUrl && (
-                                        <div className="mt-3 mb-2">
+                                        <div className="mt-3">
                                             {isVideo(report.fileUrl) ? (
-                                                <div className="relative rounded-lg overflow-hidden bg-black border border-gray-300 dark:border-gray-600">
-                                                    <video 
-                                                        src={report.fileUrl} 
-                                                        controls 
-                                                        className="w-full h-48 object-contain"
+                                                <div className="relative overflow-hidden rounded-md border border-border bg-black">
+                                                    <video
+                                                        src={report.fileUrl}
+                                                        controls
+                                                        className="h-48 w-full object-contain"
                                                     />
-                                                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider">
-                                                        🎥 Video Evidence
-                                                    </div>
+                                                    <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-sm bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                                        <Video className="size-3" aria-hidden="true" /> Video
+                                                    </span>
                                                 </div>
                                             ) : (
-                                                <div className="relative group">
-                                                    <img 
-                                                        src={report.fileUrl} 
-                                                        alt="Evidence" 
-                                                        className="w-full h-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 hover:opacity-95 transition-opacity cursor-pointer"
-                                                        onClick={() => window.open(report.fileUrl, '_blank')}
+                                                <a href={report.fileUrl} target="_blank" rel="noopener noreferrer" className="block" aria-label="Open the sighting photo in a new tab">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element -- uploaded evidence served from the file API */}
+                                                    <img
+                                                        src={report.fileUrl}
+                                                        alt={`Photo from the sighting reported by ${report.reportedBy}`}
+                                                        className="h-48 w-full rounded-md border border-border object-cover transition-opacity hover:opacity-90"
                                                     />
-                                                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider">
-                                                        📸 Photo Evidence
-                                                    </div>
-                                                </div>
+                                                </a>
                                             )}
                                         </div>
                                     )}
 
-                                    <div className="mt-2 text-xs font-mono text-gray-500 dark:text-gray-400 flex gap-4">
-                                        <span>LAT: {report.lat.toFixed(5)}</span>
-                                        <span>LNG: {report.lng.toFixed(5)}</span>
-                                    </div>
-                                </div>
+                                    <p className="mt-2 font-mono text-xs text-muted">
+                                        {report.lat.toFixed(5)}, {report.lng.toFixed(5)}
+                                    </p>
+                                </li>
                             );
                         })}
-                    </div>
+                    </ol>
                 )}
             </div>
-        </div>
+        </Card>
     );
 }

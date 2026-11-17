@@ -32,7 +32,7 @@ export default function MapInner({ position, setPosition }: MapInnerProps) {
             style={{ height: "100%", width: "100%" }}
         >
             <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 // OSM cere Referer (altfel 403 "Access blocked"); suprascrie no-referrer din layout.tsx
                 referrerPolicy="strict-origin-when-cross-origin"

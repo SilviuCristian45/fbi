@@ -8,10 +8,12 @@ interface EmptyStateProps {
   icon?: LucideIcon;
   /** "error" uses the alert color and is announced (role="alert"). */
   variant?: "empty" | "error";
+  /** Use "h1" when the empty state is the whole page. */
+  titleAs?: "h1" | "h2" | "h3";
   className?: string;
 }
 
-export function EmptyState({ title, description, action, icon, variant = "empty", className }: EmptyStateProps) {
+export function EmptyState({ title, description, action, icon, variant = "empty", titleAs: Title = "h2", className }: EmptyStateProps) {
   const Icon = icon ?? (variant === "error" ? AlertTriangle : SearchX);
   return (
     <div
@@ -26,7 +28,7 @@ export function EmptyState({ title, description, action, icon, variant = "empty"
       >
         <Icon className="size-6" aria-hidden="true" />
       </span>
-      <h2 className="text-lg font-bold">{title}</h2>
+      <Title className="text-lg font-bold">{title}</Title>
       {description && <p className="max-w-md text-muted">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>

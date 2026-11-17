@@ -107,6 +107,7 @@ export default function WantedDetailPage() {
         {backLink}
         <EmptyState
           icon={UserX}
+          titleAs="h1"
           title="Person not found"
           description="This file does not exist or could not be loaded."
           action={<Link href="/" className={buttonClasses("primary")}>Back to the wanted list</Link>}

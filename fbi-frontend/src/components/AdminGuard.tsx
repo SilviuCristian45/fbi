@@ -19,6 +19,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       <div role="alert">
         <EmptyState
           icon={ShieldAlert}
+          titleAs="h1"
           title="Not authorized"
           description="This page is only available to administrators."
           action={<Link href="/" className={buttonClasses("primary")}>Back to the wanted list</Link>}

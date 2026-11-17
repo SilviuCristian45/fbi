@@ -1,5 +1,6 @@
 "use client";
 
+import AdminGuard from "@/src/components/AdminGuard";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/src/components/Navbar";
 import { authFetch } from "@/src/lib/api-client";
@@ -35,6 +36,14 @@ interface DashboardStats {
 }
 
 export default function StatsPage() {
+  return (
+    <AdminGuard>
+      <StatsPageContent />
+    </AdminGuard>
+  );
+}
+
+function StatsPageContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

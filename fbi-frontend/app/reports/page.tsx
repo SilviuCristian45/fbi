@@ -1,5 +1,6 @@
 "use client";
 
+import AdminGuard from "@/src/components/AdminGuard";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/src/components/Navbar";
 import { getReports } from "@/src/lib/api-client";
@@ -9,6 +10,14 @@ import { useSignalR } from "@/src/context/SignalRContext";
 import toast from "react-hot-toast";
 
 export default function ReportsPage() {
+  return (
+    <AdminGuard>
+      <ReportsPageContent />
+    </AdminGuard>
+  );
+}
+
+function ReportsPageContent() {
   const [data, setData] = useState<ReportPagedResult | null>(null);
   const [loading, setLoading] = useState(true);
   const { connection } = useSignalR();

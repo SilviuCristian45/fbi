@@ -53,6 +53,7 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
                         toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
                     });
 
+					conn.off("ReceiveActivity");
 					conn.on("ReceiveActivity", (msg) => {
 						console.log("Activitate primită:", msg);
 						toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
@@ -70,9 +71,14 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
         startSocket();
 
         return () => {
+            // The manager stays mounted on every protected page, so this only runs on logout
+            // (navigation to /auth) or token change: close the socket so a later login
+            // does not leave a second live connection behind.
             conn.off("ReceiveUrgentAlert");
-            // Optional: conn.stop() daca vrei sa inchizi cand iesi din AuthGuard,
-            // dar de obicei vrem sa ramana activa in aplicatie.
+            conn.off("ReceiveActivity");
+            conn.stop().catch(() => {});
+            connectionRef.current = null;
+            setConnection(null);
         };
     }, [token]);
 
@@ -89,8 +95,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [token, setToken] = useState<string | null>(null);
 
-    // Definim paginile publice
-    const isPublicPage = pathname.startsWith("/auth") || pathname === "/";
+    // Definim paginile publice. "/" is protected too, so 10 km alerts (ReceiveActivity) also arrive on the main page.
+    const isPublicPage = pathname.startsWith("/auth");
 
     useEffect(() => {
         // 2. Verificarea se face o singură dată, la mount

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { authFetch, saveFavourite, reportLocation, uploadFile } from "@/src/lib/api-client";
+import { authFetch, saveFavourite } from "@/src/lib/api-client";
 import { PagedResult, WantedPersonSummary } from "@/src/types/wanted-person";
 import Link from "next/link";
 import { Navbar } from "@/src/components/Navbar";
-import MapModal from "@/src/components/MapModal";
+import { useReportSighting } from "@/src/lib/use-report-sighting";
 
 // --- PAGINA SAVED ---
 export default function Saved() {
@@ -14,8 +14,7 @@ export default function Saved() {
   const [favorites, setFavorites] = useState<number[]>([]);
 
   // --- STATE-URI MODAL HARTA ---
-  const [isMapOpen, setIsMapOpen] = useState(false);
-  const [selectedPersonForMap, setSelectedPersonForMap] = useState<{id: number, title: string} | null>(null);
+  const reportSighting = useReportSighting();
 
   // --- STATE-URI PAGINARE & SEARCH ---
   const [pageNumber, setPageNumber] = useState(1);
@@ -85,24 +84,7 @@ export default function Saved() {
   const handleOpenMap = (e: React.MouseEvent, person: {id: number, title: string}) => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedPersonForMap(person);
-    setIsMapOpen(true);
-  };
-
-  // --- HANDLER TRIMITERE LOCATIE ---
-  const handleSubmitLocation = async (lat: number, lng: number, details: string, file: File | null) => {
-    if (!selectedPersonForMap) return;
-
-    try {
-        const fileUrl = file ? await uploadFile(file) : "no image";
-        await reportLocation(selectedPersonForMap.id, lat, lng, details, fileUrl );
-        alert("Locația a fost trimisă cu succes! 🕵️‍♂️");
-        setIsMapOpen(false);
-        setSelectedPersonForMap(null);
-    } catch (error) {
-        alert("Eroare la trimiterea locației.");
-        console.error(error);
-    }
+    reportSighting.open(person);
   };
 
   // --- HANDLERS PAGINARE ---
@@ -254,12 +236,7 @@ export default function Saved() {
         </div>
 
         {/* MODALUL DE HARTĂ */}
-        <MapModal 
-            isOpen={isMapOpen}
-            onClose={() => setIsMapOpen(false)}
-            onSubmit={handleSubmitLocation}
-            personName={selectedPersonForMap?.title || ""}
-        />
+        {reportSighting.modal}
 
       </main>
   );

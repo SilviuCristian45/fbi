@@ -6,6 +6,7 @@ import { PagedResult, WantedPersonSummary } from "@/src/types/wanted-person";
 import Link from "next/link";
 import { Navbar } from "@/src/components/Navbar";
 import { useRouter } from 'next/navigation'
+import { useReportSighting } from "@/src/lib/use-report-sighting";
 
 // --- PAGINA PRINCIPALA ---
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
 
   // --- STATE PENTRU FAVORITE ---
   const [favorites, setFavorites] = useState<number[]>([]);
+  const reportSighting = useReportSighting();
 
   // --- STATE-URI PAGINARE & SEARCH ---
   const [pageNumber, setPageNumber] = useState(1);
@@ -181,6 +183,19 @@ export default function Home() {
                                 </svg>
                             )}
                           </button>
+
+                          {/* BUTON RAPORTARE */}
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); reportSighting.open({ id: person.id, title: person.title }); }}
+                            className="absolute top-14 right-2 z-20 p-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white dark:hover:bg-gray-700 hover:scale-110 transition-all active:scale-95 text-gray-600 dark:text-gray-300"
+                            title="Raportează Locație"
+                            aria-label={`Report a sighting of ${person.title}`}
+                          >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                                </svg>
+                          </button>
                         </div>
 
                         <div className="p-4 flex-grow">
@@ -249,6 +264,8 @@ export default function Home() {
             </>
           )}
         </div>
+
+        {reportSighting.modal}
       </main>
   );
 }

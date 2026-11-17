@@ -6,6 +6,7 @@ import { authFetchFile, getWantedPersonById } from "@/src/lib/api-client";
 import { WantedPersonDetail } from "@/src/types/wanted-person";
 import Link from "next/link";
 import SightingsList from "@/src/components/SightingsList";
+import { useReportSighting } from "@/src/lib/use-report-sighting";
 
 export default function WantedDetailPage() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function WantedDetailPage() {
   const [person, setPerson] = useState<WantedPersonDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string>("");
+  const reportSighting = useReportSighting();
 
   const exportPdf = async () => {
     if (!person || !id) return;
@@ -104,7 +106,17 @@ export default function WantedDetailPage() {
                  </div>
               )}
 
-             <div className="flex justify-center mt-6 relative z-10">
+             <div className="flex flex-wrap justify-center gap-3 mt-6 relative z-10">
+                  <button
+                    onClick={() => reportSighting.open({ id: person.id, title: person.title })}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-6 py-3 rounded shadow-lg transition-all transform hover:-translate-y-0.5 border border-blue-500"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                                </svg>
+                    REPORT A SIGHTING
+                  </button>
                   <button 
                     onClick={exportPdf}
                     className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-6 py-3 rounded shadow-lg hover:shadow-red-500/20 transition-all transform hover:-translate-y-0.5 border border-red-500"
@@ -223,8 +235,7 @@ export default function WantedDetailPage() {
                         <SightingsList wantedId={person.id} />
                         
                         <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
-                            Datele sunt criptate și accesibile doar personalului autorizat.<br/>
-                            Folosiți butonul &quot;Raportează&quot; din lista principală pentru a adăuga informații noi.
+                            Datele sunt criptate și accesibile doar personalului autorizat.
                         </div>
                     </div>
                 </div>
@@ -233,6 +244,8 @@ export default function WantedDetailPage() {
 
           </div>
         </div>
+
+        {reportSighting.modal}
       </main>
   );
 }

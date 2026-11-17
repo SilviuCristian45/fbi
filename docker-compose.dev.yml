@@ -1,0 +1,70 @@
+# ============================================================================
+# OVERLAY DEV (local, Windows/Linux cu Docker Desktop)
+#   docker compose -f docker-compose.yaml -f docker-compose.build.yml -f docker-compose.dev.yml --env-file .env up -d --build
+#   (sau scripts/dev-up.ps1 / scripts/dev-up.sh)
+#
+# - imaginile se construiesc local (docker-compose.build.yml), tag implicit "dev"
+#
+# - nginx pe HTTP simplu, publicat pe ${DEV_HTTP_PORT} (implicit 8088)
+# - porturi de debug pe host cu default-uri care NU se bat cu containerele
+#   standalone uzuale (5432, 8080, 5672, 15672, 9000, 9001)
+# - toate porturile sunt legate DOAR de 127.0.0.1 (nu sunt vizibile in reteaua
+#   locala/firmei); doar browserul si uneltele de pe aceeasi masina ajung la ele
+# - Keycloak in start-dev, fara hostname fix (consola: http://localhost:18080)
+# - fara certbot
+# ============================================================================
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DEV_DB_PORT:-15433}:5432"
+
+  keycloak:
+    command: ["start-dev", "--import-realm"]
+    environment:
+      # Fara KC_HOSTNAME: URL-urile se deduc din request (localhost:18080 /
+      # keycloak:8080 din retea). OK doar pentru dev.
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "127.0.0.1:${DEV_KEYCLOAK_PORT:-18080}:8080"
+
+  rabbitmq:
+    ports:
+      - "127.0.0.1:${DEV_RABBITMQ_AMQP_PORT:-15674}:5672"
+      - "127.0.0.1:${DEV_RABBITMQ_MGMT_PORT:-15673}:15672"
+
+  minio:
+    ports:
+      - "127.0.0.1:${DEV_MINIO_API_PORT:-19000}:9000"
+      - "127.0.0.1:${DEV_MINIO_CONSOLE_PORT:-19001}:9001"
+
+  backend:
+    environment:
+      # Activeaza Swagger (/swagger) - doar in Development
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "127.0.0.1:${DEV_BACKEND_PORT:-17002}:7002"
+
+  frontend:
+    ports:
+      - "127.0.0.1:${DEV_FRONTEND_PORT:-13000}:3000"
+
+  python-ai:
+    environment:
+      # Pozele au URL-uri http://localhost:8088/files/...; din container le
+      # descarcam prin nginx intern (localhost ar fi containerul insusi).
+      IMAGE_URL_REWRITE: "${PUBLIC_URL:?}=>http://nginx"
+    ports:
+      - "127.0.0.1:${DEV_AI_PORT:-18006}:8006"
+
+  file-api:
+    environment:
+      Minio__PublicUrl: ${FILES_PUBLIC_URL:?}
+    ports:
+      - "127.0.0.1:${DEV_FILE_API_PORT:-17005}:7005"
+
+  nginx:
+    volumes:
+      - ./nginx/templates/dev:/etc/nginx/templates:ro
+    ports:
+      - "127.0.0.1:${DEV_HTTP_PORT:-8088}:80"

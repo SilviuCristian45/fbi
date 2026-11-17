@@ -13,6 +13,10 @@ RUN dotnet publish "Fbi.MediaService.csproj" -c Release -o /app/publish /p:UseAp
 # ETAPA 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+# curl pentru healthcheck-ul din docker compose
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 
 # Setam portul 7005

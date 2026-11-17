@@ -1,0 +1,10 @@
+# Scripturile shell si config-urile montate in containere Linux trebuie sa
+# aiba LF si dupa checkout pe Windows (altfel: "bad interpreter" / erori nginx)
+*.sh               text eol=lf
+*.template         text eol=lf
+nginx/**/*.conf    text eol=lf
+postgres-init/*    text eol=lf
+.env.example       text eol=lf
+.env.prod.example  text eol=lf
+# Scripturile PowerShell raman cu CRLF
+*.ps1              text eol=crlf

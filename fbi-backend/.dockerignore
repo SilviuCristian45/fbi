@@ -1,0 +1,14 @@
+# Artefacte locale de build/IDE (imaginea face propriul restore + publish)
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+# Configurari/secrete locale: in container totul vine din env (compose)
+appsettings.Development.json
+.env
+.env.*
+Dockerfile
+.dockerignore
+readme
+test.html

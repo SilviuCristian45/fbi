@@ -1,0 +1,133 @@
+# ============================================================================
+# OVERLAY PROD (VPS public)
+#   docker compose -f docker-compose.yaml -f docker-compose.prod.yml #     --env-file .env.prod --env-file .env.release up -d
+#   (sau scripts/prod-deploy.sh, care verifica .env.prod, imaginile si certificatul)
+#
+# - FARA build pe VPS: imaginile proprii ${IMAGE_PREFIX}/<serviciu>:${IMAGE_TAG}
+#   se construiesc pe PC (scripts/release-build.sh) si se trimit cu
+#   scripts/release-push.sh, care scrie IMAGE_TAG in .env.release (gitignored).
+#   pull_policy: never -> compose nu incearca niciodata sa le descarce dintr-un
+#   registry (ex. Docker Hub, unde "fbi/backend" ar putea fi imaginea altcuiva).
+#   Imaginile terte (postgres, keycloak, silo, rabbitmq, certbot) se descarca normal.
+# - DOAR nginx e public (80/443). Restul serviciilor sunt doar pe reteaua
+#   interna Docker. Exceptie: consolele de administrare (Keycloak, MinIO,
+#   RabbitMQ) sunt legate pe 127.0.0.1 al VPS-ului, accesibile numai prin
+#   tunel SSH (vezi docs/prod). Nu sunt expuse pe interfata publica.
+# - Keycloak in modul de productie (start), hostname din DOMAIN
+# - restart: unless-stopped, log rotation, limite de memorie
+# - certificate Let's Encrypt in volume numite, reinnoite automat de certbot
+# ============================================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    restart: unless-stopped
+    logging: *default-logging
+
+  keycloak:
+    command: ["start", "--import-realm"]
+    environment:
+      KC_HOSTNAME: https://${DOMAIN:?}
+      # Backend-ul vorbeste cu Keycloak intern (http://keycloak:8080):
+      # endpoint-urile de backchannel (token, jwks) raman pe adresa interna.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      # Consola de admin NU e publicata prin nginx; se acceseaza prin tunel SSH
+      # pe http://localhost:${KC_ADMIN_TUNNEL_PORT}/admin/
+      KC_HOSTNAME_ADMIN: http://localhost:${KC_ADMIN_TUNNEL_PORT:-18080}
+      # KC_HOSTNAME_STRICT ramane true (implicit in modul start)
+    ports:
+      - "127.0.0.1:${KC_ADMIN_TUNNEL_PORT:-18080}:8080"
+    mem_limit: ${KEYCLOAK_MEMORY_LIMIT:-1g}
+    restart: unless-stopped
+    logging: *default-logging
+
+  rabbitmq:
+    ports:
+      # Management UI doar prin tunel SSH
+      - "127.0.0.1:${RABBITMQ_MGMT_TUNNEL_PORT:-15673}:15672"
+    restart: unless-stopped
+    logging: *default-logging
+
+  minio:
+    ports:
+      # Consola MinIO doar prin tunel SSH
+      - "127.0.0.1:${MINIO_CONSOLE_TUNNEL_PORT:-19001}:9001"
+    restart: unless-stopped
+    logging: *default-logging
+
+  backend:
+    image: ${IMAGE_PREFIX:-fbi}/backend:${IMAGE_TAG:-no-release}
+    pull_policy: never
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    restart: unless-stopped
+    logging: *default-logging
+
+  frontend:
+    image: ${IMAGE_PREFIX:-fbi}/frontend:${IMAGE_TAG:-no-release}
+    pull_policy: never
+    # NEXT_PUBLIC_* (https://DOMAIN/...) sunt coapte in imagine de release-build.sh
+    restart: unless-stopped
+    logging: *default-logging
+
+  python-ai:
+    image: ${IMAGE_PREFIX:-fbi}/python-ai:${IMAGE_TAG:-no-release}
+    pull_policy: never
+    # TensorFlow + DeepFace: ~650 MiB idle, varf ~850 MiB la sync (masurat); peste limita -> OOM kill + restart
+    mem_limit: ${AI_MEMORY_LIMIT:-2g}
+    restart: unless-stopped
+    logging: *default-logging
+
+  file-api:
+    image: ${IMAGE_PREFIX:-fbi}/file-api:${IMAGE_TAG:-no-release}
+    pull_policy: never
+    environment:
+      Minio__PublicUrl: https://${DOMAIN:?}/files
+    restart: unless-stopped
+    logging: *default-logging
+
+  nginx:
+    image: ${IMAGE_PREFIX:-fbi}/nginx:${IMAGE_TAG:-no-release}
+    pull_policy: never
+    environment:
+      DOMAIN: ${DOMAIN:?}
+    volumes:
+      - ./nginx/templates/prod:/etc/nginx/templates:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
+    ports:
+      # Implicit 80/443. Schimba-le doar pentru teste locale (alt stack pe 80/443);
+      # Let's Encrypt (init-ssl.sh) are nevoie de portul 80 real.
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    networks:
+      app_network:
+        # Containerele (ex. python-ai, care descarca pozele de la
+        # https://DOMAIN/files/...) ajung direct la nginx, fara hairpin prin IP-ul public.
+        aliases:
+          - ${DOMAIN:?}
+    restart: unless-stopped
+    logging: *default-logging
+
+  # Reinnoire automata: incearca `certbot renew` la 12h (reinnoieste doar
+  # cand certificatul expira in < 30 zile). Nginx isi face reload singur la 6h.
+  # Primul certificat se obtine cu scripts/init-ssl.sh.
+  certbot:
+    image: certbot/certbot:v5.10.0
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    networks:
+      - app_network
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  letsencrypt:
+  certbot_webroot:

@@ -7,6 +7,10 @@ certbot/logs/
 # --- SECRETE (NU LE URCA NICIODATA) ---
 .env
 .env.local
+.env.prod
+# Tag-ul imaginilor curente/anterioare pe VPS (scris de scripts/release-push.sh)
+.env.release
+.env.*.local
 *.pem
 *.key
 *.pfx
@@ -41,3 +45,17 @@ build/
 # --- IDE ---
 .idea/
 .vscode/
+
+# --- Generate de scripturi ---
+# HTML-ul documentatiei (generat de scripts/build-docs din docs/**/*.md)
+docs/html/
+# Backup-uri locale (scripts/backup.sh)
+backups/
+# Indexul facial se genereaza (scripts/sync-faces.sh), nu se commite
+fbi_vectors.pkl
+fbi_vectors.pkl.tmp
+# Loguri cron + starea logrotate (scripts/install-cron.sh)
+logs/*
+# ...dar rapoartele per poza ale sync-ului facial (scripts/sync-faces.sh) se commit
+!logs/sync-faces/
+!logs/sync-faces/*.log

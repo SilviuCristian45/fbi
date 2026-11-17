@@ -272,6 +272,9 @@ namespace FbiApi.Migrations
                     b.Property<string>("PlaceOfBirth")
                         .HasColumnType("text");
 
+                    b.Property<string>("PosterClassification")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("PublicationDate")
                         .HasColumnType("timestamp without time zone");
 

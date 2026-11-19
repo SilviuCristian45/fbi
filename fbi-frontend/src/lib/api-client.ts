@@ -93,7 +93,7 @@ export async function saveFavourite(personId: number, save: boolean) {
   return authFetch<SavePerson>(`/FbiWanted/${personId}/${save}`, {method: 'POST'});
 }
 
-export async function reportLocation(wantedId: number, lat: number, lng: number, details: string, fileUrl: string): Promise<ApiResponse<boolean>> {
+export async function reportLocation(wantedId: number, lat: number, lng: number, details: string, fileUrl: string | null): Promise<ApiResponse<boolean>> {
   return authFetch("/FbiWanted/report-location", { // Asigura-te ca ai endpoint-ul asta in .NET
     method: "POST",
     body: JSON.stringify({ wantedId, lat, lng, details, fileUrl }),

@@ -25,9 +25,9 @@ export function useReportSighting() {
     if (!target) return;
 
     try {
-      const fileUrl = file ? await uploadFile(file) : "no image";
+      const fileUrl = file ? await uploadFile(file) : null;
       await reportLocation(target.id, lat, lng, details, fileUrl);
-      toast.success("Sighting reported. Thank you — the photo is being analysed.");
+      toast.success(fileUrl ? "Sighting reported. Thank you — the photo is being analysed." : "Sighting reported. Thank you.");
       setIsOpen(false);
       setTarget(null);
     } catch (error) {

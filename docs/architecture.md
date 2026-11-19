@@ -168,7 +168,7 @@ sequenceDiagram
     A->>D: INSERT LocationWantedPersons (Status = 0 Pending)
     A-->>B: SignalR ReceiveLocation (all clients)
     A-->>B: SignalR ReceiveActivity (users within 10 km)
-    A->>Q: Send AnalyzeFaceCommand {ReportId, ImageUrl} to face-analysis-queue
+    A->>Q: Send AnalyzeFaceCommand {ReportId, ImageUrl} to face-analysis-queue (only with a photo)
     Q->>P: consume (prefetch 1)
     P->>N: GET /files/... (downloads the photo by its public URL)
     P->>P: DeepFace Facenet embedding, cosine match vs in-memory index (< 0.40, top 5)
@@ -192,8 +192,11 @@ Step by step:
    the URL. `WantedPersonsService` saves a `LocationWantedPerson` with status
    `Pending`, broadcasts `ReceiveLocation` to every SignalR client and sends
    `ReceiveActivity` to connected users whose saved location is within 10 km
-   (Haversine). It then sends `AnalyzeFaceCommand` through MassTransit to
-   `queue:<RABBITMQ_QUEUE_ANALYSIS>`.
+   (Haversine). If the report has a photo, it then sends `AnalyzeFaceCommand`
+   through MassTransit to `queue:<RABBITMQ_QUEUE_ANALYSIS>`. A report without a
+   photo is stored with an empty `FileUrl`, is never sent to the AI worker and
+   is left out of the admin reports list (`GET /api/FbiWanted/reports`); it
+   still shows up in the person's sightings.
 3. **Analysis.** `python-ai` consumes the queue with pika (one message at a
    time). It reads the MassTransit envelope (`message.ReportId`,
    `message.ImageUrl`) and downloads the photo **by its public URL**. In prod,

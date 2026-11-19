@@ -162,6 +162,11 @@ public class WantedPersonsService : IWantedPersonsService
     public async Task<ServiceResult<OperationStatus>> reportLocation(ReportLocationRequest reportLocationRequest, string userId, string username) {
         
         try {
+            // Fără poză nu avem ce analiza: salvăm FileUrl gol și nu trimitem la AI.
+            // "no image" e placeholder-ul trimis de frontend-urile vechi.
+            var fileUrl = reportLocationRequest.FileUrl?.Trim();
+            var hasPhoto = !string.IsNullOrEmpty(fileUrl) && !fileUrl.Equals("no image", StringComparison.OrdinalIgnoreCase);
+
             var location = _context.LocationWantedPersons.Add(new LocationWantedPerson {
                 Latitude = reportLocationRequest.Lat,
                 Longitude = reportLocationRequest.Lng,
@@ -170,7 +175,7 @@ public class WantedPersonsService : IWantedPersonsService
                 UserId = userId,
                 Username = username,
                 ReportedAt = DateTime.UtcNow,
-                FileUrl = reportLocationRequest.FileUrl,
+                FileUrl = hasPhoto ? fileUrl : "",
             });
 
             await _context.SaveChangesAsync();
@@ -233,15 +238,17 @@ public class WantedPersonsService : IWantedPersonsService
 
             // await _context.SaveChangesAsync();
 
-            var queueName = _configuration["RabbitMq:Queue"];
-            var uri = queueName.StartsWith("queue:") ? new Uri($"{queueName}") : new Uri($"queue:{queueName}");
-            var endpoint = await _sendEndpointProvider.GetSendEndpoint(uri);
-    
-            // Trimite comanda
-            await endpoint.Send(new AnalyzeFaceCommand { 
-                ReportId = location.Entity.Id, 
-                ImageUrl = reportLocationRequest.FileUrl 
-            });
+            if (hasPhoto) {
+                var queueName = _configuration["RabbitMq:Queue"];
+                var uri = queueName.StartsWith("queue:") ? new Uri($"{queueName}") : new Uri($"queue:{queueName}");
+                var endpoint = await _sendEndpointProvider.GetSendEndpoint(uri);
+
+                // Trimite comanda
+                await endpoint.Send(new AnalyzeFaceCommand {
+                    ReportId = location.Entity.Id,
+                    ImageUrl = fileUrl
+                });
+            }
 
 
             return new OperationStatus(true);
@@ -378,6 +385,7 @@ public class WantedPersonsService : IWantedPersonsService
             .Include(p => p.personMatchResults)
             .Include(p => p.WantedPerson)
             .AsNoTracking() // Optimizare: Read-Only e mai rapid
+            .Where(p => p.FileUrl != "") // rapoartele fără poză nu au analiză
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(search))

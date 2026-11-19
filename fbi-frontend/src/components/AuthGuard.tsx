@@ -1,10 +1,12 @@
 "use client";
 
 import * as signalR from "@microsoft/signalr";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
+import { AppToaster, AlertToast } from "./ui/Toast";
 import { usePathname, useRouter } from "next/navigation";
 import { SignalRProvider, useSignalR } from "../context/SignalRContext";
 import { useEffect, useState, useRef } from "react";
+import { playAlertTone } from "../lib/alert-sound";
 
 // --- HELPER TOKEN ---
 function getStoredToken() {
@@ -48,14 +50,14 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
                     
                     conn.off("ReceiveUrgentAlert");
                     conn.on("ReceiveUrgentAlert", (msg) => {
-                        const audio = new Audio('/sounds/alarm.mp3');
-                        audio.play().catch(() => {});
-                        toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
+                        playAlertTone();
+                        toast.custom((t) => <AlertToast t={t} title="Critical alert">{msg}</AlertToast>, { duration: 10000 });
                     });
 
+					conn.off("ReceiveActivity");
 					conn.on("ReceiveActivity", (msg) => {
 						console.log("Activitate primită:", msg);
-						toast.error(`ALERTĂ CRITICĂ: ${msg}`, { duration: 10000 });
+						toast.custom((t) => <AlertToast t={t} title="Sighting near your location">{msg}</AlertToast>, { duration: 10000 });
 					});
 
                     setConnection(conn);
@@ -70,9 +72,14 @@ function SignalRManager({ children, token }: SignalRManagerProps) {
         startSocket();
 
         return () => {
+            // The manager stays mounted on every protected page, so this only runs on logout
+            // (navigation to /auth) or token change: close the socket so a later login
+            // does not leave a second live connection behind.
             conn.off("ReceiveUrgentAlert");
-            // Optional: conn.stop() daca vrei sa inchizi cand iesi din AuthGuard,
-            // dar de obicei vrem sa ramana activa in aplicatie.
+            conn.off("ReceiveActivity");
+            conn.stop().catch(() => {});
+            connectionRef.current = null;
+            setConnection(null);
         };
     }, [token]);
 
@@ -89,8 +96,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [token, setToken] = useState<string | null>(null);
 
-    // Definim paginile publice
-    const isPublicPage = pathname.startsWith("/auth") || pathname === "/";
+    // Definim paginile publice. "/" is protected too, so 10 km alerts (ReceiveActivity) also arrive on the main page.
+    const isPublicPage = pathname.startsWith("/auth");
 
     useEffect(() => {
         // 2. Verificarea se face o singură dată, la mount
@@ -128,8 +135,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // Asta previne eroarea "Client-side exception"
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-100">
-                <div className="text-xl font-semibold text-gray-600">Se verifică autentificarea...</div>
+            <div className="flex h-screen items-center justify-center" role="status">
+                <div className="flex items-center gap-3 text-muted">
+                    <span className="size-5 rounded-full border-2 border-border border-t-primary motion-safe:animate-spin" aria-hidden="true" />
+                    Checking your session…
+                </div>
             </div>
         );
     }
@@ -144,7 +154,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     return (
         <SignalRProvider>
             <SignalRManager token={token}>
-                <Toaster />
+                <AppToaster />
                 {children}
             </SignalRManager>
         </SignalRProvider>

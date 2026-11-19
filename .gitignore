@@ -59,3 +59,4 @@ logs/*
 # ...dar rapoartele per poza ale sync-ului facial (scripts/sync-faces.sh) se commit
 !logs/sync-faces/
 !logs/sync-faces/*.log
+CREDENTIALS.local.md

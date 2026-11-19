@@ -1,0 +1,36 @@
+{
+  "login-desktop": [],
+  "home-desktop": [
+    "[error] Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
+  ],
+  "wanted-detail-desktop": [
+    "[http 404] http://localhost:28088/fbi-seal.png",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[error] Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
+  ],
+  "saved-desktop": [
+    "[error] Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
+  ],
+  "my-location-desktop": [],
+  "stats-desktop": [
+    "[warning] The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width."
+  ],
+  "reports-desktop": [],
+  "login-mobile": [],
+  "home-mobile": [
+    "[error] Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
+  ],
+  "wanted-detail-mobile": [
+    "[http 404] http://localhost:28088/fbi-seal.png",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[error] Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
+  ],
+  "saved-mobile": [
+    "[error] Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
+  ],
+  "my-location-mobile": [],
+  "stats-mobile": [
+    "[warning] The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width."
+  ],
+  "reports-mobile": []
+}

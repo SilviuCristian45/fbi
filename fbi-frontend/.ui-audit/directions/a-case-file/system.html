@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Case File · System</title>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="../system.css">
+</head>
+<body>
+<div id="system"></div>
+<script>
+window.SYSTEM = {
+  tokens: ["bg", "surface", "surface-2", "ink", "muted", "rule", "primary", "stamp", "ok", "pending"],
+  fonts: [
+    { label: "Source Serif 4 600 · headings, names", style: "font:600 34px/1.1 var(--serif)", sample: "Daniel R. Mercer" },
+    { label: "IBM Plex Sans 400/500 · UI and body", style: "font:400 15px/1.55 var(--sans);max-width:46ch", sample: "Report the sighting with a photo and the exact location. The analysis usually finishes in a few seconds." },
+    { label: "IBM Plex Mono 500 · case numbers, coordinates, timestamps", style: "font:500 13px var(--mono);letter-spacing:.06em", sample: "CASE FILE No. 1042 · 44.43960, 26.11570 · 14:32" },
+  ],
+  components: `
+    <div class="sys-row"><button class="btn primary">Report a sighting</button><button class="btn">Download dossier</button><button class="btn danger">Sign out</button><button class="btn ghost">Cancel</button></div>
+    <div class="sys-row"><span class="stamp pending">Pending</span><span class="stamp completed">Completed</span><span class="stamp suspect">Suspect found</span><span class="live">Connected</span><span class="role">ADMIN</span></div>
+    <div><label class="label">Search</label><input class="input" placeholder="Search by name or description"></div>
+    <div class="tab-row" role="tablist"><button role="tab" aria-selected="true">Details</button><button role="tab">Sightings</button><button role="tab">Analysis</button></div>
+    <div class="card" style="padding:14px 16px;border-left:3px solid var(--stamp);display:flex;gap:12px;align-items:start">
+      <span class="stamp suspect">Alert</span><div><b>Sighting within 10 km</b><div style="color:var(--muted);font-size:13.5px">Daniel R. Mercer · Bucharest, Sector 2 · 14:32</div></div></div>`,
+};
+</script>
+<script src="../system.js"></script>
+</body>
+</html>

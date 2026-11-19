@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Case File · Person</title>
+<link rel="stylesheet" href="../vendor/leaflet.css"><link rel="stylesheet" href="style.css">
+<style>
+  .crumb { padding: 22px 0 0; font-size: 13px; }
+  .file { margin: 16px 0 0; position: relative; }
+  .file-tab { display: inline-block; background: var(--surface); border: 1px solid var(--rule); border-bottom: 0; padding: 8px 16px; font: 500 12px var(--mono); letter-spacing: .1em; position: relative; top: 1px; }
+  .sheet { padding: 32px; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 36px; }
+  .photo img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border: 1px solid var(--rule); display: block; }
+  .thumbs { display: flex; gap: 8px; margin-top: 10px; }
+  .thumbs img { width: 56px; height: 56px; object-fit: cover; border: 1px solid var(--rule); opacity: .7; }
+  .thumbs img:first-child { opacity: 1; outline: 2px solid var(--ink); outline-offset: 1px; }
+  .caption { font: 12px var(--mono); color: var(--muted); margin-top: 8px; }
+  .title-row { display: flex; justify-content: space-between; align-items: start; gap: 20px; }
+  h1 { font-size: 44px; line-height: 1.05; }
+  .subjects { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .subjects span { font-size: 12.5px; border: 1px solid var(--rule); padding: 3px 8px; }
+  .actions { display: flex; gap: 10px; margin: 22px 0 26px; flex-wrap: wrap; }
+  dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; margin: 0; }
+  dl div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px dotted var(--rule); font-size: 14.5px; }
+  dt { color: var(--muted); } dd { margin: 0; font-weight: 500; text-align: right; }
+  .reward { margin-top: 22px; padding: 14px 16px; border: 1px solid var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .reward strong { font: 700 24px var(--serif); }
+  .aliases { margin-top: 20px; font-size: 14px; } .aliases span { font-family: var(--mono); font-size: 13px; }
+  .lower { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 24px; margin-top: 24px; align-items: start; }
+  .section { padding: 24px 28px; }
+  .section h2 { font-size: 21px; margin-bottom: 10px; }
+  .remarks { border-left: 3px solid var(--stamp); padding-left: 18px; margin: 14px 0 0; }
+  .remarks .eyebrow { color: var(--stamp); }
+  .feed-map { height: 240px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .timeline { list-style: none; margin: 0; padding: 8px 20px 16px; }
+  .timeline li { position: relative; padding: 12px 0 12px 22px; border-left: 1px solid var(--rule); font-size: 14px; }
+  .timeline li::before { content: ""; position: absolute; left: -5px; top: 18px; width: 9px; height: 9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--muted); }
+  .timeline li.new::before { border-color: var(--stamp); background: var(--stamp); }
+  .timeline time { font: 12px var(--mono); color: var(--muted); }
+  @media (max-width: 900px) { .sheet { grid-template-columns: 1fr; padding: 20px; } .photo { max-width: 340px; } .lower { grid-template-columns: 1fr; } h1 { font-size: 34px; } }
+  @media (max-width: 640px) { dl { grid-template-columns: 1fr; } .title-row { flex-direction: column; } .section { padding: 20px; } .actions .btn { flex: 1 1 auto; justify-content: center; } }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <div class="brand">Sightline <small>Case index</small></div>
+  <nav class="nav" aria-label="Main"><a href="#" aria-current="page">Cases</a><a href="#">Saved</a><a href="#">My location</a><a href="#">Reports</a><a href="#">Statistics</a></nav>
+  <div class="user"><span class="live">Live</span><span class="name">admin</span><span class="role">ADMIN</span><button class="btn ghost menu-btn" aria-label="Open menu">☰</button></div>
+</div></header>
+
+<main class="wrap">
+  <div class="crumb"><a href="dashboard.html">← Case index</a></div>
+  <div class="file">
+    <div class="file-tab">CASE FILE · No. 1042</div>
+    <article class="card sheet">
+      <div class="photo">
+        <img id="main" alt="Photo of Daniel R. Mercer">
+        <div class="thumbs" id="thumbs"></div>
+        <div class="caption">Source: public FBI Wanted API</div>
+      </div>
+      <div>
+        <div class="title-row">
+          <div><div class="eyebrow">Criminal Enterprise Investigations</div><h1>Daniel R. Mercer</h1>
+            <div class="subjects"><span>Drug trafficking</span><span>Conspiracy</span></div></div>
+          <span class="stamp suspect big">Suspect found · 87%</span>
+        </div>
+        <div class="actions">
+          <button class="btn primary">Report a sighting</button>
+          <button class="btn">Download dossier (PDF)</button>
+          <button class="btn ghost" aria-pressed="true">★ Saved</button>
+        </div>
+        <dl>
+          <div><dt>Sex</dt><dd>Male</dd></div><div><dt>Race</dt><dd>White</dd></div>
+          <div><dt>Hair</dt><dd>Brown</dd></div><div><dt>Eyes</dt><dd>Blue</dd></div>
+          <div><dt>Height</dt><dd>5'11"</dd></div><div><dt>Born</dt><dd>1981</dd></div>
+        </dl>
+        <div class="aliases"><span class="eyebrow">Known aliases</span><br><span>"Danny M."</span> · <span>"D. Ross"</span> · <span>"The Accountant"</span></div>
+        <div class="reward"><span class="eyebrow">Reward</span><strong>up to $100,000</strong></div>
+      </div>
+    </article>
+  </div>
+
+  <div class="lower">
+    <section class="card section">
+      <h2>Case details</h2>
+      <p>Sample text. Mercer is sought for his alleged role in coordinating a transnational trafficking network. He is believed to travel frequently between several countries using forged documents.</p>
+      <div class="remarks"><div class="eyebrow">Caution</div><p style="margin:.4em 0 0">Should be considered armed and dangerous. Do not approach; report the sighting with a photo and the exact location.</p></div>
+    </section>
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px"><h2 style="font-size:19px">Sightings</h2><span class="live">Live</span></div>
+      <div id="map" class="feed-map"></div>
+      <ul class="timeline">
+        <li class="new"><time>Today 14:32</time><br><b>agent.ionescu</b> — Bucharest, Sector 2 <span class="stamp suspect" style="padding:2px 4px;margin-left:4px">87% match</span></li>
+        <li><time>Yesterday 09:15</time><br><b>m.popa</b> — Piața Unirii, near the metro exit</li>
+        <li><time>12 Nov 18:40</time><br><b>d.stan</b> — Băneasa, parking lot</li>
+      </ul>
+    </section>
+  </div>
+  <p class="disclaimer">Educational project, not affiliated with the FBI. Data from the public FBI Wanted API.</p>
+</main>
+<script src="../vendor/leaflet.js"></script><script src="../common.js"></script>
+<script>
+  document.getElementById("main").src = portrait(0);
+  document.getElementById("thumbs").innerHTML = [0, 3, 6].map(t => `<img src="${portrait(t)}" alt="">`).join("");
+  makeMap("map", { tiles: isDark() ? TILES.darkMatter : TILES.positron, points: MOCK.sightings.map((ll, i) => ({ ll, status: i === 0 ? "suspect" : "pending" })),
+    route: { color: getComputedStyle(document.documentElement).getPropertyValue("--stamp"), weight: 2, dashArray: "4 6" }, markerHtml: p => `<div class="pin ${p.status}"></div>` });
+</script>
+</body>
+</html>

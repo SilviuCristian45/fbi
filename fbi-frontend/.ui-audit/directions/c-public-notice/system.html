@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · Public Notice · System</title>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="../system.css">
+</head>
+<body>
+<div id="system"></div>
+<script>
+window.SYSTEM = {
+  tokens: ["bg", "subtle", "text", "muted", "border", "primary", "primary-soft", "alert", "pending", "ok"],
+  fonts: [
+    { label: "Public Sans 800 · display", style: "font:800 40px/1.05 var(--sans);letter-spacing:-.02em", sample: "Have you seen this person?" },
+    { label: "Public Sans 400 16px · body (min. 16px, line-height 1.6)", style: "font:400 16px/1.6 var(--sans);max-width:46ch", sample: "If you recognise someone, report where and when you saw them. A photo helps: it is compared automatically with the list." },
+    { label: "IBM Plex Mono · only for coordinates and IDs", style: "font:400 13px var(--mono)", sample: "Case 1042 · 44.43960, 26.11570" },
+  ],
+  components: `
+    <div class="sys-row"><button class="btn primary">Report a sighting</button><button class="btn">Download dossier</button><button class="btn quiet">Cancel</button><button class="btn alert">Sign out</button></div>
+    <div class="sys-row"><span class="badge pending">Pending</span><span class="badge completed">Completed</span><span class="badge suspect">Suspect found</span><span class="dot">Live alerts on</span></div>
+    <div><label class="label" for="s1">Where did you see them?</label><input class="input" id="s1" placeholder="Street, area or landmark"></div>
+    <div class="sys-row"><button class="chip" aria-pressed="true">All</button><button class="chip">Violent crime</button><button class="chip">With reward</button></div>
+    <div class="notice" style="border-left:4px solid var(--alert)"><span class="badge suspect">Alert</span><div><b>Sighting within 10 km of your location</b><div style="color:var(--muted);font-size:14px">Daniel R. Mercer · Bucharest, Sector 2 · 14:32</div></div></div>`,
+};
+</script>
+<script src="../system.js"></script>
+</body>
+</html>

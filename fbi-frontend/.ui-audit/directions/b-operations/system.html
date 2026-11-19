@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · Operations · System</title>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="../system.css">
+</head>
+<body>
+<div id="system"></div>
+<script>
+window.SYSTEM = {
+  tokens: ["bg", "panel", "panel-2", "border", "text", "muted", "primary", "alert", "critical", "ok"],
+  fonts: [
+    { label: "Inter 600 · headings (small, dense)", style: "font:600 22px/1.2 var(--sans);letter-spacing:-.01em", sample: "Operations overview" },
+    { label: "Inter 400 13.5px · UI, tabular figures", style: "font:400 13.5px/1.5 var(--sans);max-width:46ch", sample: "42 reports in the last 7 days, 5 still in analysis. Matches above 80% are flagged as suspect found." },
+    { label: "JetBrains Mono 500 · IDs, timestamps, coordinates", style: "font:500 12.5px var(--mono)", sample: "#2310 · 14:32:08 · 44.43960, 26.11570 · 87.4%" },
+  ],
+  components: `
+    <div class="sys-row"><button class="btn primary">Report sighting</button><button class="btn">Download PDF</button><button class="btn ghost">Cancel</button><button class="btn danger">Sign out</button></div>
+    <div class="sys-row"><span class="badge pending">Pending</span><span class="badge completed">Completed</span><span class="badge suspect">Suspect found</span><span class="conn">Live</span><span class="role">ADMIN</span></div>
+    <input class="input" placeholder="Search cases, reports, places" aria-label="Search">
+    <div class="panel"><table><thead><tr><th>Report</th><th>Status</th><th>Match</th></tr></thead><tbody>
+      <tr><td class="mono">#2310</td><td><span class="badge suspect">Suspect found</span></td><td class="mono">87.4%</td></tr>
+      <tr><td class="mono">#2309</td><td><span class="badge pending">Pending</span></td><td style="color:var(--faint)">—</td></tr></tbody></table></div>
+    <div class="panel" style="padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:12px;border-left:3px solid var(--critical)">
+      <span class="pin suspect" style="margin:4px"></span><div><b>Sighting within 10 km</b><div style="color:var(--muted)">Daniel R. Mercer · Bucharest, Sector 2 · 14:32</div></div></div>`,
+};
+</script>
+<script src="../system.js"></script>
+</body>
+</html>

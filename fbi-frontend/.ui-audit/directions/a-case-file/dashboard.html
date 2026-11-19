@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Case File · Dashboard</title>
+<link rel="stylesheet" href="../vendor/leaflet.css"><link rel="stylesheet" href="style.css">
+<style>
+  .head { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 36px 0 20px; flex-wrap: wrap; }
+  .head h1 { font-size: 34px; }
+  .head p { margin: 6px 0 0; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 24px; align-items: start; }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  .tools { display: flex; gap: 10px; padding: 14px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+  .tools .input { flex: 1 1 220px; }
+  .row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--rule); text-decoration: none; color: inherit; }
+  .row:hover { background: var(--surface-2); }
+  .row img { width: 56px; height: 70px; object-fit: cover; border: 1px solid var(--rule); }
+  .row .name { font: 600 17px/1.25 var(--serif); }
+  .row .meta { font-size: 13px; color: var(--muted); margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .row .meta .mono { font-size: 12px; }
+  .row .side { display: flex; flex-direction: column; align-items: end; gap: 8px; }
+  .row .act { font-size: 13px; }
+  .pager { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-size: 13px; color: var(--muted); }
+  .map { height: 360px; border-bottom: 1px solid var(--rule); }
+  .panel-h { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+  .panel-h h2 { font-size: 18px; }
+  .log { list-style: none; margin: 0; padding: 0; }
+  .log li { display: grid; grid-template-columns: 52px 1fr; gap: 12px; padding: 12px 16px; border-bottom: 1px dashed var(--rule); font-size: 14px; }
+  .log time { font: 500 12px/1.6 var(--mono); color: var(--muted); }
+  .log b { font-weight: 600; }
+  .log small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--rule); }
+  .kpis div { padding: 14px 16px; border-right: 1px solid var(--rule); } .kpis div:last-child { border: 0; }
+  .kpis strong { display: block; font: 600 26px/1.1 var(--serif); }
+  @media (max-width: 640px) {
+    .head h1 { font-size: 27px; }
+    .row { grid-template-columns: 48px minmax(0, 1fr); }
+    .row img { width: 48px; height: 60px; }
+    .row .side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; }
+    .map { height: 260px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <div class="brand">Sightline <small>Case index</small></div>
+  <nav class="nav" aria-label="Main">
+    <a href="#" aria-current="page">Cases</a><a href="#">Saved</a><a href="#">My location</a><a href="#">Reports</a><a href="#">Statistics</a>
+  </nav>
+  <div class="user"><span class="live">Live</span><span class="name">admin</span><span class="role">ADMIN</span><button class="btn ghost menu-btn" aria-label="Open menu">☰</button></div>
+</div></header>
+
+<main class="wrap">
+  <div class="head">
+    <div><div class="eyebrow">Public wanted list · 1,279 files</div><h1>Case index</h1><p>Persons sought, with the latest field sightings and analysis status.</p></div>
+    <button class="btn primary">+ Report a sighting</button>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="Cases">
+      <div class="tools">
+        <input class="input" placeholder="Search by name or description" aria-label="Search cases">
+        <select class="input" style="flex:0 0 170px" aria-label="Subject"><option>All subjects</option></select>
+      </div>
+      <div id="rows"></div>
+      <div class="pager"><span>Showing 1–8 of 1,279</span><span><button class="btn ghost">← Previous</button> <button class="btn">Next →</button></span></div>
+    </section>
+
+    <aside style="display:grid; gap:24px">
+      <section class="card">
+        <div class="panel-h"><h2>Sightings map</h2><span class="eyebrow">Last 7 days</span></div>
+        <div class="kpis"><div><span class="eyebrow">Reports</span><strong>42</strong></div><div><span class="eyebrow">Pending</span><strong>5</strong></div><div><span class="eyebrow">Matches</span><strong>3</strong></div></div>
+        <div id="map" class="map"></div>
+      </section>
+      <section class="card">
+        <div class="panel-h"><h2>Latest entries</h2><span class="live">Connected</span></div>
+        <ul class="log" id="log"></ul>
+      </section>
+    </aside>
+  </div>
+  <p class="disclaimer">Educational project, not affiliated with the FBI. Data from the public FBI Wanted API.</p>
+</main>
+
+<script src="../vendor/leaflet.js"></script><script src="../common.js"></script>
+<script>
+  const label = { pending: "Pending", completed: "Completed", suspect: "Suspect found" };
+  document.getElementById("rows").innerHTML = MOCK.people.map(p => `
+    <a class="row" href="person.html${location.search}">
+      <img src="${portrait(p.tone)}" alt="">
+      <div><div class="name">${p.name}</div>
+        <div class="meta"><span class="mono">No. ${p.id}</span><span>${p.subject}</span>${p.reward ? `<span>Reward ${p.reward}</span>` : ""}</div></div>
+      <div class="side"><span class="stamp ${p.status}">${label[p.status]}</span><span class="act">${p.sightings} sightings</span></div>
+    </a>`).join("");
+  document.getElementById("log").innerHTML = MOCK.feed.map(f => `
+    <li><time>${f.time}</time><div><b>${f.what}</b> — ${f.person}<small>${f.place} · by ${f.who} ${f.conf ? `· <span class="stamp suspect" style="padding:2px 4px">${f.conf}% match</span>` : ""}</small></div></li>`).join("");
+  makeMap("map", { tiles: isDark() ? TILES.darkMatter : TILES.positron, markerHtml: p => `<div class="pin ${p.status}"></div>` });
+</script>
+</body>
+</html>

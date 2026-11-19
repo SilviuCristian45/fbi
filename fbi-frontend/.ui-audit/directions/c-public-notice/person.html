@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · Public Notice · Person</title>
+<link rel="stylesheet" href="../vendor/leaflet.css"><link rel="stylesheet" href="style.css">
+<style>
+  .back { display: inline-block; margin: 24px 0 0; font-weight: 600; }
+  .poster { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 48px; padding: 24px 0 8px; }
+  .poster img.main { width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 12px; display: block; }
+  .thumbs { display: flex; gap: 10px; margin-top: 12px; }
+  .thumbs button { padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; cursor: pointer; }
+  .thumbs button[aria-current] { border-color: var(--strong-border); }
+  .thumbs img { width: 64px; height: 64px; object-fit: cover; display: block; }
+  .poster h1 { font-size: 60px; margin-top: 10px; }
+  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .reward { margin-top: 24px; padding: 18px 20px; border-radius: 10px; background: var(--subtle); border: 1px solid var(--border); }
+  .reward strong { display: block; font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+  .cta { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  .cta .btn.primary { padding: 16px 24px; font-size: 17px; }
+  .facts { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--strong-border); }
+  .facts div { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .facts dt { color: var(--muted); font-size: 14px; } .facts dd { margin: 2px 0 0; font-weight: 600; font-size: 17px; }
+  .tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--border); margin-top: 48px; }
+  .tabs a { padding: 14px 0; font-weight: 600; color: var(--muted); text-decoration: none; border-bottom: 3px solid transparent; }
+  .tabs a[aria-selected="true"] { color: var(--text); border-color: var(--primary); }
+  .tabs .count { display: inline-block; min-width: 22px; padding: 1px 7px; margin-left: 6px; border-radius: 999px; background: var(--subtle); font-size: 13px; color: var(--text); }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-top: 28px; }
+  #map { height: 420px; border-radius: 10px; border: 1px solid var(--border); }
+  .sightings { display: grid; gap: 12px; }
+  .s { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+  .s img { width: 96px; height: 96px; border-radius: 8px; object-fit: cover; }
+  .s .top { display: flex; justify-content: space-between; gap: 8px; align-items: start; flex-wrap: wrap; }
+  .s .meta { color: var(--muted); font-size: 14px; }
+  .caution { margin-top: 32px; padding: 18px 20px; border-left: 4px solid var(--alert); background: var(--alert-soft); border-radius: 0 10px 10px 0; }
+  @media (max-width: 1000px) { .poster { grid-template-columns: 320px minmax(0, 1fr); gap: 32px; } .poster h1 { font-size: 44px; } .two { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) {
+    .poster { grid-template-columns: 1fr; gap: 20px; } .poster h1 { font-size: 36px; }
+    .poster img.main { aspect-ratio: 1/1; }
+    .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cta .btn { flex: 1 1 100%; }
+    .tabs { gap: 18px; overflow-x: auto; }
+    #map { height: 280px; }
+    .s { grid-template-columns: 72px minmax(0, 1fr); } .s img { width: 72px; height: 72px; }
+  }
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="brand" href="#"><i aria-hidden="true"></i>Sightline</a>
+  <nav class="links" aria-label="Main"><a href="#" aria-current="page">Wanted</a><a href="#">Saved</a><a href="#">My location</a><a href="#">Reports</a><a href="#">Statistics</a></nav>
+  <div class="me"><span class="dot hide-md">Live alerts on</span><span class="hide-md">admin · Admin</span><button class="icon-btn burger" aria-label="Open menu">☰</button></div>
+</div></header>
+
+<main class="wrap">
+  <a class="back" href="dashboard.html">← All wanted people</a>
+  <section class="poster">
+    <div>
+      <img class="main" id="main" alt="Photo of Daniel R. Mercer">
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+    <div>
+      <div class="overline">Criminal enterprise · Case 1042</div>
+      <h1>Daniel R. Mercer</h1>
+      <div class="tags"><span class="badge suspect">Suspect found · 87%</span><span class="chip">Drug trafficking</span><span class="chip">Conspiracy</span></div>
+      <div class="reward"><span class="overline">Reward</span><strong>Up to $100,000</strong></div>
+      <div class="cta"><button class="btn primary">Report a sighting</button><button class="btn">Download dossier (PDF)</button><button class="icon-btn" style="width:50px;height:50px" aria-label="Saved" aria-pressed="true">★</button></div>
+      <dl class="facts">
+        <div><dt>Sex</dt><dd>Male</dd></div><div><dt>Race</dt><dd>White</dd></div><div><dt>Born</dt><dd>1981</dd></div>
+        <div><dt>Hair</dt><dd>Brown</dd></div><div><dt>Eyes</dt><dd>Blue</dd></div><div><dt>Height</dt><dd>5'11"</dd></div>
+      </dl>
+      <p style="margin:18px 0 0;color:var(--muted)">Also known as <b style="color:var(--text)">Danny M.</b>, <b style="color:var(--text)">D. Ross</b>, <b style="color:var(--text)">The Accountant</b>.</p>
+    </div>
+  </section>
+
+  <div class="caution"><b>Caution.</b> Should be considered armed and dangerous. Do not approach — report the sighting with a photo and the exact location instead.</div>
+
+  <nav class="tabs" role="tablist"><a href="#" role="tab" aria-selected="true">Sightings <span class="count">6</span></a><a href="#" role="tab">Case details</a><a href="#" role="tab">Analysis <span class="count">3</span></a></nav>
+  <div class="two">
+    <div id="map"></div>
+    <div class="sightings" id="list"></div>
+  </div>
+</main>
+<footer class="wrap footer">Educational project, not affiliated with the FBI. Wanted-person data comes from the public FBI Wanted API.</footer>
+
+<script src="../vendor/leaflet.js"></script><script src="../common.js"></script>
+<script>
+  document.getElementById("main").src = portrait(0);
+  document.getElementById("thumbs").innerHTML = [0, 3, 6].map((t, i) => `<button ${i ? "" : 'aria-current="true"'} aria-label="Photo ${i + 1}"><img src="${portrait(t)}" alt=""></button>`).join("");
+  const s = [["Today, 14:32", "Bucharest, Sector 2", "agent.ionescu", "suspect", "Suspect found · 87%"], ["Yesterday, 09:15", "Piața Unirii, metro exit", "m.popa", "completed", "No match"], ["12 Nov, 18:40", "Băneasa, parking lot", "d.stan", "pending", "Analysing"]];
+  document.getElementById("list").innerHTML = s.map((x, i) => `<article class="s"><img src="${portrait(i + 2)}" alt="Photo from sighting">
+    <div><div class="top"><b>${x[1]}</b><span class="badge ${x[3]}">${x[4]}</span></div><div class="meta">${x[0]} · reported by ${x[2]}</div>
+    <a href="#" style="font-size:14px;font-weight:600">Open in maps</a></div></article>`).join("");
+  makeMap("map", { tiles: TILES.voyager, points: MOCK.sightings.map((ll, i) => ({ ll, status: i === 0 ? "suspect" : i === 2 ? "pending" : "completed" })),
+    route: { color: getComputedStyle(document.documentElement).getPropertyValue("--primary"), weight: 3, opacity: .7 }, markerHtml: p => `<div class="pin ${p.status}"></div>` });
+</script>
+</body>
+</html>
